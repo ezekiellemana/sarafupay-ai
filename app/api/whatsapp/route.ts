@@ -2,6 +2,28 @@ import { after, NextResponse } from "next/server";
 import { env } from "@/lib/env";
 import { downloadWhatsAppMedia, markRead, verifyMetaSignature } from "@/lib/channels/whatsapp";
 import { handleIncoming } from "@/lib/agent/engine";
+import { getDb, schema } from "@/lib/db";
+
+// Claim a WhatsApp message id once. Meta re-delivers the same webhook when the
+// first attempt is slow (Render cold start), which used to produce duplicate replies.
+const recent = new Set<string>();
+async function claimMessage(id: string): Promise<boolean> {
+  if (recent.has(id)) return false;
+  recent.add(id);
+  if (recent.size > 5000) recent.clear();
+  try {
+    const db = await getDb();
+    const rows = await db
+      .insert(schema.processedMessages)
+      .values({ id })
+      .onConflictDoNothing()
+      .returning({ id: schema.processedMessages.id });
+    return rows.length > 0;
+  } catch (e) {
+    console.error("[whatsapp] dedupe check failed", e);
+    return true;
+  }
+}
 
 // Meta webhook verification handshake.
 export async function GET(req: Request) {
@@ -38,6 +60,7 @@ export async function POST(req: Request) {
         const profileName = value?.contacts?.find((c) => c.wa_id === m.from)?.profile?.name;
         // Respond to Meta immediately; do the AI work after the response is sent.
         after(async () => {
+          if (!(await claimMessage(m.id))) return;
           void markRead(m.id);
           let text = m.text?.body ?? m.button?.text ?? m.interactive?.button_reply?.title ?? m.interactive?.list_reply?.title;
           let audio: { data: Uint8Array; mimeType: string } | undefined;
