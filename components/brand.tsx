@@ -3,14 +3,10 @@ import Link from "next/link";
 export function Logo({ light = false }: { light?: boolean }) {
   return (
     <Link href="/" className="inline-flex items-center gap-2 group" aria-label="SarafuPay home">
-      <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden>
-        <circle cx="17" cy="17" r="16" fill={light ? "#f7f0e3" : "#0e3b2c"} />
-        <circle cx="12" cy="15" r="5.5" fill="#f2a516" />
-        <circle cx="22" cy="15" r="5.5" fill="#c4502f" opacity="0.9" />
-        <circle cx="17" cy="22" r="5.5" fill={light ? "#0e3b2c" : "#f7f0e3"} opacity="0.95" />
-      </svg>
+      {/* eslint-disable-next-line @next/next/no-img-element -- static brand mark, no optimisation needed */}
+      <img src="/brand/sarafupay-icon.png" width={34} height={34} alt="" className="h-[34px] w-[34px] rounded-full" />
       <span className={`font-display text-xl font-semibold tracking-tight ${light ? "text-paper" : "text-ink"}`}>
-        Sarafu<span className="text-terracotta">Pay</span>
+        <span style={{ color: light ? undefined : "#035034" }}>Sarafu</span><span style={{ color: "#C4A237" }}>Pay</span>
       </span>
     </Link>
   );
