@@ -16,7 +16,7 @@ export const env = {
   paypalApiBase: () => "https://api-m.sandbox.paypal.com", // sandbox only, per hackathon rules
 
   geminiApiKey: () => get("GOOGLE_GENERATIVE_AI_API_KEY", get("GEMINI_API_KEY")),
-  geminiModel: () => get("GEMINI_MODEL", "gemini-2.5-flash"),
+  geminiModel: () => get("GEMINI_MODEL", "gemini-3.8-flash"),
 
   waToken: () => get("WHATSAPP_ACCESS_TOKEN"),
   waPhoneNumberId: () => get("WHATSAPP_PHONE_NUMBER_ID"),
