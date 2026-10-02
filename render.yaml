@@ -1,0 +1,55 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+# Paid plans are used on purpose: free web services sleep (slow WhatsApp replies) and
+# free Postgres expires after 30 days, before judging ends. The hackathon's $50 Render credit covers it.
+services:
+  - type: web
+    name: sarafupay-ai
+    runtime: node
+    plan: starter
+    region: frankfurt
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sarafupay-db
+          property: connectionString
+      - key: ENABLE_SIMULATOR
+        value: "true"
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
+      - key: WHATSAPP_VERIFY_TOKEN
+        generateValue: true
+      - key: APP_URL
+        sync: false
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_SECRET
+        sync: false
+      - key: PAYPAL_WEBHOOK_ID
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: WHATSAPP_ACCESS_TOKEN
+        sync: false
+      - key: WHATSAPP_PHONE_NUMBER_ID
+        sync: false
+      - key: WHATSAPP_APP_SECRET
+        sync: false
+      - key: WHATSAPP_DISPLAY_NUMBER
+        sync: false
+      - key: SANDBOX_BUYER_EMAIL
+        sync: false
+      - key: SANDBOX_BUYER_PASSWORD
+        sync: false
+      - key: NEXT_PUBLIC_AG_STUDIO_LICENSE_KEY
+        sync: false
+
+databases:
+  - name: sarafupay-db
+    plan: basic-256mb
+    region: frankfurt
+    postgresMajorVersion: "16"
