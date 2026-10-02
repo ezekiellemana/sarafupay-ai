@@ -21,7 +21,7 @@ services:
       - key: ENABLE_SIMULATOR
         value: "true"
       - key: GEMINI_MODEL
-        value: gemini-2.5-flash
+        value: gemini-3.8-flash
       - key: WHATSAPP_VERIFY_TOKEN
         generateValue: true
       - key: APP_URL
