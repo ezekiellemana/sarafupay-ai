@@ -10,6 +10,7 @@ import { collectionUrl, dashboardUrl, payUrl, shareMessage } from "../services/l
 import { createAndSendPledgeInvoice, toolkitToolsForAgent } from "../paypal/toolkit";
 import { getDb, schema } from "../db";
 import { and, eq, ilike } from "drizzle-orm";
+import { langOf, t } from "../i18n";
 
 export type AgentContext = { user: User; channel: "whatsapp" | "sim" };
 
@@ -90,7 +91,7 @@ export function buildTools(ctx: AgentContext): Record<string, Tool> {
           code: col.code,
           public_page: collectionUrl(col.code),
           owner_dashboard: dashboardUrl(col),
-          share_message: shareMessage(col, ctx.user.name),
+          share_message: shareMessage(col, ctx.user.name, await langOf(ctx.user.phone)),
           note: "Give the owner the code, then paste the share_message verbatim so they can forward it to their groups. Mention the private dashboard link.",
         };
       }),
@@ -280,9 +281,16 @@ export function buildTools(ctx: AgentContext): Record<string, Tool> {
           amountCents: toCents(i.amount),
           note: i.purpose,
         });
+        const L = await langOf(ctx.user.phone);
+        const amt = money(p.amountCents, p.currency);
+        const to = `${p.recipientName ?? p.recipientEmail} (${p.recipientEmail})`;
         await sendTo(
           ctx.user.phone,
-          `🔐 *Confirm payout*\n${money(p.amountCents, p.currency)} from *${col.code}* → ${p.recipientName ?? p.recipientEmail} (${p.recipientEmail})\nFor: ${p.note}\n\nReply *CONFIRM ${p.confirmCode}* to send it with PayPal, or *CANCEL ${p.confirmCode}*. Expires in 15 min.`,
+          t(
+            L,
+            `🔐 *Thibitisha malipo*\n${amt} kutoka *${col.code}* → ${to}\nKwa ajili ya: ${p.note}\n\nJibu *CONFIRM ${p.confirmCode}* kutuma kupitia PayPal, au *CANCEL ${p.confirmCode}*. Muda unaisha baada ya dakika 15.`,
+            `🔐 *Confirm payout*\n${amt} from *${col.code}* → ${to}\nFor: ${p.note}\n\nReply *CONFIRM ${p.confirmCode}* to send it with PayPal, or *CANCEL ${p.confirmCode}*. Expires in 15 min.`,
+          ),
         );
         return {
           ok: true,
@@ -310,7 +318,7 @@ export function buildTools(ctx: AgentContext): Record<string, Tool> {
       execute: safe(async ({ code: c }) => {
         const col = await mustFind(c);
         const owner = await core.getUser(col.ownerId);
-        return { share_message: shareMessage(col, owner?.name), note: "Paste share_message verbatim." };
+        return { share_message: shareMessage(col, owner?.name, await langOf(ctx.user.phone)), note: "Paste share_message verbatim." };
       }),
     }),
 

@@ -8,6 +8,7 @@ import * as core from "../services/core";
 import { buildTools } from "./tools";
 import { systemPrompt } from "./prompt";
 import { withGeminiFallback } from "./models";
+import { langOf, t } from "../i18n";
 
 export type Incoming = {
   phone: string; // digits for WhatsApp, "sim:<digits>" for simulator
@@ -63,7 +64,7 @@ async function process(msg: Incoming): Promise<void> {
   if (cancel) return sendTo(msg.phone, await core.cancelPayoutByCode(user, cancel[2]));
 
   if (!text && !msg.audio) {
-    return sendTo(msg.phone, "I can read text and listen to voice notes 🙂 Please send one of those.");
+    return sendTo(msg.phone, t(await langOf(msg.phone), "Ninasoma maandishi na kusikiliza voice notes 🙂 Tafadhali tuma mojawapo.", "I can read text and listen to voice notes 🙂 Please send one of those."));
   }
   if (!env.geminiApiKey() && !modelOverride) {
     return sendTo(msg.phone, "⚙️ The AI brain isn't configured yet (missing GEMINI_API_KEY).");
@@ -110,6 +111,6 @@ async function process(msg: Incoming): Promise<void> {
     if (reply) await sendTo(msg.phone, reply);
   } catch (e) {
     console.error("[agent] generation failed", e);
-    await sendTo(msg.phone, "😕 Sorry, I hit a problem just now. Please try again in a moment.");
+    await sendTo(msg.phone, t(await langOf(msg.phone), "😕 Samahani, nimepata hitilafu kidogo. Tafadhali jaribu tena baada ya muda mfupi.", "😕 Sorry, I hit a problem just now. Please try again in a moment."));
   }
 }
