@@ -7,6 +7,7 @@ import { sendTo } from "../channels/messaging";
 import { captureOrder, createContributionOrder } from "../paypal/orders";
 import { getPayoutBatch, sendPayout } from "../paypal/payouts";
 import { dashboardUrl, payUrl } from "./links";
+import { langOf, t, type Lang } from "../i18n";
 
 const { users, collections, contributions, pledges, payouts } = schema;
 
@@ -156,11 +157,14 @@ export async function collectionStats(c: Collection): Promise<CollectionStats> {
   };
 }
 
-export function statusLine(c: Collection, s: CollectionStats): string {
-  return `${progressBar(s.raisedCents, c.targetCents)} ${s.percent}% · ${money(s.raisedCents, c.currency)} of ${money(
-    c.targetCents,
-    c.currency,
-  )} from ${s.paidCount} contributor${s.paidCount === 1 ? "" : "s"}`;
+export function statusLine(c: Collection, s: CollectionStats, lang: Lang = "en"): string {
+  const raised = money(s.raisedCents, c.currency);
+  const target = money(c.targetCents, c.currency);
+  return `${progressBar(s.raisedCents, c.targetCents)} ${s.percent}% · ${t(
+    lang,
+    `${raised} kati ya ${target} kutoka kwa wachangiaji ${s.paidCount}`,
+    `${raised} of ${target} from ${s.paidCount} contributor${s.paidCount === 1 ? "" : "s"}`,
+  )}`;
 }
 
 export async function listContributions(collectionId: string, status?: string) {
@@ -288,20 +292,34 @@ async function onContributionPaid(ctb: Contribution) {
   if (ctb.contributorId) {
     const contributor = await getUser(ctb.contributorId);
     if (contributor) {
+      const L = await langOf(contributor.phone);
+      const ref = ctb.paypalCaptureId ?? ctb.paypalOrderId;
       await sendTo(
         contributor.phone,
-        `✅ *Payment received* — thank you, ${ctb.displayName}!\n${amount} to *${col.title}* (${col.code}).\nPayPal ref: ${ctb.paypalCaptureId ?? ctb.paypalOrderId}\n\n${statusLine(col, stats)}`,
+        t(
+          L,
+          `✅ *Malipo yamepokelewa* — asante, ${ctb.displayName}!\n${amount} kwa *${col.title}* (${col.code}).\nKumbukumbu ya PayPal: ${ref}\n\n${statusLine(col, stats, L)}`,
+          `✅ *Payment received* — thank you, ${ctb.displayName}!\n${amount} to *${col.title}* (${col.code}).\nPayPal ref: ${ref}\n\n${statusLine(col, stats, L)}`,
+        ),
       );
     }
   }
   if (owner && owner.id !== ctb.contributorId) {
+    const L = await langOf(owner.phone);
+    const note = ctb.message ? `\n“${ctb.message}”` : "";
     await sendTo(
       owner.phone,
-      `💰 *${ctb.displayName}* contributed ${amount} to *${col.code}*${ctb.message ? `\n“${ctb.message}”` : ""}\n${statusLine(col, stats)}`,
+      t(
+        L,
+        `💰 *${ctb.displayName}* amechangia ${amount} kwa *${col.code}*${note}\n${statusLine(col, stats, L)}`,
+        `💰 *${ctb.displayName}* contributed ${amount} to *${col.code}*${note}\n${statusLine(col, stats, L)}`,
+      ),
     );
   }
   if (owner && stats.raisedCents >= col.targetCents && stats.raisedCents - ctb.amountCents < col.targetCents) {
-    await sendTo(owner.phone, `🎉 *${col.title}* just reached its target of ${money(col.targetCents, col.currency)}!`);
+    const L = await langOf(owner.phone);
+    const target = money(col.targetCents, col.currency);
+    await sendTo(owner.phone, t(L, `🎉 *${col.title}* imefikia lengo lake la ${target}!`, `🎉 *${col.title}* just reached its target of ${target}!`));
   }
 }
 
@@ -328,11 +346,12 @@ export async function createPledge(input: {
     .returning();
   const owner = await getUser(input.collection.ownerId);
   if (owner && owner.id !== input.user.id) {
+    const L = await langOf(owner.phone);
+    const amt = money(input.amountCents, input.collection.currency);
+    const due = input.dueDate ? t(L, ` (kufikia ${input.dueDate})`, ` (by ${input.dueDate})`) : "";
     await sendTo(
       owner.phone,
-      `🤞 *${input.displayName}* pledged ${money(input.amountCents, input.collection.currency)} to *${input.collection.code}*${
-        input.dueDate ? ` (by ${input.dueDate})` : ""
-      }.`,
+      t(L, `🤞 *${input.displayName}* ameahidi ${amt} kwa *${input.collection.code}*${due}.`, `🤞 *${input.displayName}* pledged ${amt} to *${input.collection.code}*${due}.`),
     );
   }
   return p!;
@@ -360,11 +379,15 @@ export async function remindPledgers(col: Collection): Promise<{ reminded: strin
       amountCents: p.amountCents,
       source: u.channel === "sim" ? "sim" : "whatsapp",
     });
+    const L = await langOf(u.phone);
+    const amt = money(p.amountCents, col.currency);
     await sendTo(
       u.phone,
-      `👋 Hi ${p.displayName}, a friendly reminder about your pledge of ${money(p.amountCents, col.currency)} to *${col.title}*${
-        p.dueDate ? ` (due ${p.dueDate})` : ""
-      }.\nPay securely with PayPal: ${payUrl(ctb.id)}`,
+      t(
+        L,
+        `👋 Habari ${p.displayName}, kumbusho la kirafiki kuhusu ahadi yako ya ${amt} kwa *${col.title}*${p.dueDate ? ` (tarehe ${p.dueDate})` : ""}.\nLipa kwa usalama kupitia PayPal: ${payUrl(ctb.id)}`,
+        `👋 Hi ${p.displayName}, a friendly reminder about your pledge of ${amt} to *${col.title}*${p.dueDate ? ` (due ${p.dueDate})` : ""}.\nPay securely with PayPal: ${payUrl(ctb.id)}`,
+      ),
     );
     await db.update(pledges).set({ remindedAt: new Date() }).where(eq(pledges.id, p.id));
     reminded.push(p.displayName);
@@ -417,8 +440,9 @@ export async function proposePayout(input: {
  */
 export async function confirmPayoutByCode(user: User, code: string): Promise<string> {
   const db = await getDb();
+  const L = await langOf(user.phone);
   const owned = await listOwnedCollections(user.id);
-  if (!owned.length) return "You don't have any collections, so there is nothing to confirm.";
+  if (!owned.length) return t(L, "Huna mchango wowote, kwa hiyo hakuna cha kuthibitisha.", "You don't have any collections, so there is nothing to confirm.");
   const [p] = await db
     .select()
     .from(payouts)
@@ -429,23 +453,23 @@ export async function confirmPayoutByCode(user: User, code: string): Promise<str
         eq(payouts.status, "awaiting_confirmation"),
       ),
     );
-  if (!p) return "❌ That confirmation code doesn't match any pending payout. Ask me to prepare the payout again.";
+  if (!p) return t(L, "❌ Msimbo huo haulingani na malipo yoyote yanayosubiri. Niombe niandae malipo upya.", "❌ That confirmation code doesn't match any pending payout. Ask me to prepare the payout again.");
   if (Date.now() - new Date(p.createdAt).getTime() > 15 * 60_000) {
     await db.update(payouts).set({ status: "cancelled" }).where(eq(payouts.id, p.id));
-    return "⌛ That payout request expired (15 minutes). Ask me to prepare it again.";
+    return t(L, "⌛ Ombi hilo la malipo limeisha muda (dakika 15). Niombe niliandae tena.", "⌛ That payout request expired (15 minutes). Ask me to prepare it again.");
   }
   const col = owned.find((c) => c.id === p.collectionId)!;
   const stats = await collectionStats(col);
   if (p.amountCents > stats.availableCents) {
     await db.update(payouts).set({ status: "cancelled" }).where(eq(payouts.id, p.id));
-    return `❌ Balance changed — only ${money(stats.availableCents, col.currency)} is available now.`;
+    return t(L, `❌ Salio limebadilika — sasa kuna ${money(stats.availableCents, col.currency)} tu.`, `❌ Balance changed — only ${money(stats.availableCents, col.currency)} is available now.`);
   }
   const [locked] = await db
     .update(payouts)
     .set({ status: "processing", executedAt: new Date() })
     .where(and(eq(payouts.id, p.id), eq(payouts.status, "awaiting_confirmation")))
     .returning();
-  if (!locked) return "This payout is already being processed.";
+  if (!locked) return t(L, "Malipo haya tayari yanashughulikiwa.", "This payout is already being processed.");
   try {
     const res = await sendPayout({
       payoutId: p.id,
@@ -457,18 +481,25 @@ export async function confirmPayoutByCode(user: User, code: string): Promise<str
     });
     await db.update(payouts).set({ paypalBatchId: res.batchId }).where(eq(payouts.id, p.id));
     schedulePayoutRefresh(p.id);
-    return `🚀 Payout sent to PayPal: ${money(p.amountCents, p.currency)} → ${p.recipientName ?? p.recipientEmail}.\nBatch ${res.batchId} (${res.batchStatus}). I'll confirm when it completes and post a transparency update to contributors.`;
+    const amt = money(p.amountCents, p.currency);
+    const who = p.recipientName ?? p.recipientEmail;
+    return t(
+      L,
+      `🚀 Malipo yametumwa PayPal: ${amt} → ${who}.\nBatch ${res.batchId} (${res.batchStatus}). Nitathibitisha yakikamilika na kutuma taarifa ya uwazi kwa wachangiaji.`,
+      `🚀 Payout sent to PayPal: ${amt} → ${who}.\nBatch ${res.batchId} (${res.batchStatus}). I'll confirm when it completes and post a transparency update to contributors.`,
+    );
   } catch (e) {
     const reason = e instanceof Error ? e.message : String(e);
     await db.update(payouts).set({ status: "failed", failureReason: reason.slice(0, 500) }).where(eq(payouts.id, p.id));
-    return `❌ PayPal rejected the payout: ${reason.slice(0, 200)}`;
+    return t(L, `❌ PayPal imekataa malipo: ${reason.slice(0, 200)}`, `❌ PayPal rejected the payout: ${reason.slice(0, 200)}`);
   }
 }
 
 export async function cancelPayoutByCode(user: User, code: string): Promise<string> {
   const db = await getDb();
+  const L = await langOf(user.phone);
   const owned = await listOwnedCollections(user.id);
-  if (!owned.length) return "Nothing to cancel.";
+  if (!owned.length) return t(L, "Hakuna cha kughairi.", "Nothing to cancel.");
   const rows = await db
     .update(payouts)
     .set({ status: "cancelled" })
@@ -480,7 +511,9 @@ export async function cancelPayoutByCode(user: User, code: string): Promise<stri
       ),
     )
     .returning();
-  return rows.length ? "👍 Payout cancelled. No money moved." : "No pending payout with that code.";
+  return rows.length
+    ? t(L, "👍 Malipo yameghairiwa. Hakuna pesa iliyohamishwa.", "👍 Payout cancelled. No money moved.")
+    : t(L, "Hakuna malipo yanayosubiri yenye msimbo huo.", "No pending payout with that code.");
 }
 
 function schedulePayoutRefresh(payoutId: string) {
@@ -518,14 +551,30 @@ export async function finalizePayout(p: Payout, status: "success" | "failed", it
   const owner = col ? await getUser(col.ownerId) : undefined;
   if (!col) return done;
   if (status === "failed") {
-    if (owner) await sendTo(owner.phone, `⚠️ Payout of ${money(p.amountCents, p.currency)} to ${p.recipientEmail} failed: ${reason}. The money is back in the collection balance.`);
+    if (owner) {
+      const L = await langOf(owner.phone);
+      const amt = money(p.amountCents, p.currency);
+      await sendTo(
+        owner.phone,
+        t(L, `⚠️ Malipo ya ${amt} kwenda ${p.recipientEmail} yameshindwa: ${reason}. Pesa imerudi kwenye salio la mchango.`, `⚠️ Payout of ${amt} to ${p.recipientEmail} failed: ${reason}. The money is back in the collection balance.`),
+      );
+    }
     return done;
   }
   const stats = await collectionStats(col);
-  const update = `🧾 *Transparency update — ${col.title}*\n${money(p.amountCents, p.currency)} was paid to *${p.recipientName ?? p.recipientEmail}*${
-    p.note ? ` for ${p.note}` : ""
-  }.\nRaised ${money(stats.raisedCents, col.currency)} · Paid out ${money(stats.paidOutCents, col.currency)} · Balance ${money(stats.availableCents, col.currency)}\nPayPal payout ref: ${done.paypalItemId ?? done.paypalBatchId}`;
-  if (owner) await sendTo(owner.phone, update);
+  const amt = money(p.amountCents, p.currency);
+  const who = p.recipientName ?? p.recipientEmail;
+  const raised = money(stats.raisedCents, col.currency);
+  const paid = money(stats.paidOutCents, col.currency);
+  const bal = money(stats.availableCents, col.currency);
+  const ref = done.paypalItemId ?? done.paypalBatchId;
+  const update = (L: Lang) =>
+    t(
+      L,
+      `🧾 *Taarifa ya uwazi — ${col.title}*\n${amt} imelipwa kwa *${who}*${p.note ? ` kwa ajili ya ${p.note}` : ""}.\nZilizochangwa ${raised} · Zilizolipwa ${paid} · Salio ${bal}\nKumbukumbu ya PayPal: ${ref}`,
+      `🧾 *Transparency update — ${col.title}*\n${amt} was paid to *${who}*${p.note ? ` for ${p.note}` : ""}.\nRaised ${raised} · Paid out ${paid} · Balance ${bal}\nPayPal payout ref: ${ref}`,
+    );
+  if (owner) await sendTo(owner.phone, update(await langOf(owner.phone)));
   // Broadcast to every distinct contributor reachable in chat.
   const contributorIds = await db
     .selectDistinct({ id: contributions.contributorId })
@@ -534,7 +583,7 @@ export async function finalizePayout(p: Payout, status: "success" | "failed", it
   for (const { id } of contributorIds) {
     if (!id || id === owner?.id) continue;
     const u = await getUser(id);
-    if (u) await sendTo(u.phone, update);
+    if (u) await sendTo(u.phone, update(await langOf(u.phone)));
   }
   return done;
 }
