@@ -93,6 +93,13 @@ export const chatLog = pgTable(
   (t) => [index("chat_phone_idx").on(t.phone, t.id)],
 );
 
+// WhatsApp message ids we already handled. Meta retries webhooks (e.g. while the
+// server cold-starts), so every inbound id is claimed exactly once.
+export const processedMessages = pgTable("processed_messages", {
+  id: text("id").primaryKey(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export type User = typeof users.$inferSelect;
 export type Collection = typeof collections.$inferSelect;
 export type Contribution = typeof contributions.$inferSelect;

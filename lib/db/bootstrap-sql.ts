@@ -80,4 +80,8 @@ CREATE TABLE IF NOT EXISTS chat_log (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS chat_phone_idx ON chat_log (phone, id);
+CREATE TABLE IF NOT EXISTS processed_messages (
+  id text PRIMARY KEY,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
 `;
