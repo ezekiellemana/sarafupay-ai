@@ -17,6 +17,11 @@ export const env = {
 
   geminiApiKey: () => get("GOOGLE_GENERATIVE_AI_API_KEY", get("GEMINI_API_KEY")),
   geminiModel: () => get("GEMINI_MODEL", "gemini-3.8-flash"),
+  /** Tried in order when the primary model is overloaded (503), rate-limited (429) or retired (404). */
+  geminiModels: () =>
+    [get("GEMINI_MODEL", "gemini-3.8-flash"), ...get("GEMINI_FALLBACK_MODELS", "gemini-3.6-flash,gemini-3.5-flash,gemini-3.5-flash-lite").split(",")]
+      .map((m) => m.trim())
+      .filter((m, i, a) => m && a.indexOf(m) === i),
 
   waToken: () => get("WHATSAPP_ACCESS_TOKEN"),
   waPhoneNumberId: () => get("WHATSAPP_PHONE_NUMBER_ID"),
