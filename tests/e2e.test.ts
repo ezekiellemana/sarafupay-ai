@@ -91,9 +91,10 @@ async function main() {
   await core.applyCapture("ORDER1", "COMPLETED", "CAPTURE1", ctb.id, "amina@example.com");
   await core.applyCapture("ORDER1", "COMPLETED", "CAPTURE1", ctb.id, "amina@example.com"); // idempotent
   const aminaMsgs = await inbox(AMINA);
-  assert.equal(aminaMsgs.filter((m) => m.includes("Payment received")).length, 1, "exactly one receipt");
+  assert.equal(aminaMsgs.filter((m) => /Payment received|Malipo yamepokelewa/.test(m)).length, 1, "exactly one receipt");
   const ownerMsgs = await inbox(OWNER);
   assert.ok(ownerMsgs.some((m) => m.includes("Amina") && m.includes("$40.00")), "owner alerted");
+  assert.ok(aminaMsgs.some((m) => m.includes("Malipo yamepokelewa")), "Tanzanian contributor gets a Swahili receipt");
   console.log("✓ capture settled once, receipt + owner alert sent");
 
   // 4. Pledge by John, owner reminds
@@ -131,7 +132,7 @@ async function main() {
   assert.equal(payoutCalls.length, 1, "no double payout");
   const done = await core.refreshPayout(pending.id);
   assert.equal(done?.status, "success");
-  assert.ok((await inbox(AMINA)).some((m) => m.includes("Transparency update") && m.includes("Mama Lishe")), "contributors notified");
+  assert.ok((await inbox(AMINA)).some((m) => /Transparency update|Taarifa ya uwazi/.test(m) && m.includes("Mama Lishe")), "contributors notified");
   const stats = await core.collectionStats(col);
   assert.equal(stats.availableCents, 1000);
   console.log("✓ payout confirmed by code, executed once, transparency broadcast; balance", stats.availableCents / 100);
