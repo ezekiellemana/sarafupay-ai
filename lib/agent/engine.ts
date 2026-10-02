@@ -1,6 +1,5 @@
 import "server-only";
 import { generateText, isStepCount, type ModelMessage } from "ai";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { desc, eq } from "drizzle-orm";
 import { env } from "../env";
 import { getDb, schema } from "../db";
@@ -8,6 +7,7 @@ import { logInbound, sendTo } from "../channels/messaging";
 import * as core from "../services/core";
 import { buildTools } from "./tools";
 import { systemPrompt } from "./prompt";
+import { withGeminiFallback } from "./models";
 
 export type Incoming = {
   phone: string; // digits for WhatsApp, "sim:<digits>" for simulator
@@ -35,11 +35,6 @@ export function __setModelForTests(m: typeof modelOverride) {
   modelOverride = m;
 }
 
-function model() {
-  if (modelOverride) return modelOverride;
-  const google = createGoogleGenerativeAI({ apiKey: env.geminiApiKey() });
-  return google(env.geminiModel());
-}
 
 async function history(phone: string, limit = 16): Promise<ModelMessage[]> {
   const db = await getDb();
@@ -92,20 +87,25 @@ async function process(msg: Incoming): Promise<void> {
     : { role: "user", content: text };
 
   try {
-    const result = await generateText({
-      model: model(),
-      system: systemPrompt({
-        user,
-        owned: ownedSummary,
-        active,
-        channel: msg.channel,
-        today: new Date().toISOString().slice(0, 10),
-      }),
-      messages: [...(await history(msg.phone)), current],
-      tools: buildTools(ctx),
-      stopWhen: isStepCount(8),
-      temperature: 0.3,
+    const system = systemPrompt({
+      user,
+      owned: ownedSummary,
+      active,
+      channel: msg.channel,
+      today: new Date().toISOString().slice(0, 10),
     });
+    const messages = [...(await history(msg.phone)), current];
+    const run = (model: Parameters<typeof generateText>[0]["model"]) =>
+      generateText({
+        model,
+        system,
+        messages,
+        tools: buildTools(ctx),
+        stopWhen: isStepCount(8),
+        temperature: 0.3,
+        maxRetries: 1,
+      });
+    const result = modelOverride ? await run(modelOverride) : await withGeminiFallback((m) => run(m));
     const reply = result.text.trim();
     if (reply) await sendTo(msg.phone, reply);
   } catch (e) {
