@@ -1,26 +1,54 @@
-# SarafuPay: group collections on WhatsApp, powered by PayPal + AI
+<p align="center">
+  <img src="public/brand/sarafupay-icon.png" alt="SarafuPay" width="96" />
+</p>
 
-> **Michango, without the notebook.** An AI agent inside WhatsApp that runs group collections for weddings, funerals, medical bills, school fees, NGOs and community groups. It collects with **PayPal** and pays out in the open.
+<h1 align="center">SarafuPay</h1>
 
-Built for the [PayPal AI Hackathon 2026](https://paypalaihackathon.devpost.com). Everything runs on the **PayPal sandbox** (test money).
+<p align="center"><b>Michango, without the notebook.</b><br/>
+An AI agent inside WhatsApp that runs group collections with <b>PayPal</b> and pays out in the open.</p>
+
+<p align="center">
+  <a href="https://sarafupay-ai.onrender.com">Live app</a> ·
+  <a href="https://sarafupay-ai.onrender.com/chat">WhatsApp simulator</a> ·
+  <a href="https://wa.me/255650972587">Chat on WhatsApp</a> ·
+  <a href="docs/DEVPOST.md">Devpost write-up</a>
+</p>
+
+Built for the [PayPal AI Hackathon 2026](https://paypalaihackathon.devpost.com). All money movement runs on the **PayPal sandbox** (test money only).
+
+---
+
+## Try it now
+
+| Option | How |
+|---|---|
+| **Real WhatsApp** | Message **+255 650 972 587** (display name *SarafuPay*), e.g. `Hi, I want to collect $300 for a wedding` |
+| **Web simulator** (no phone needed) | Open [`/chat`](https://sarafupay-ai.onrender.com/chat). Same agent, same PayPal sandbox, switch between Organiser and Friends |
+| **Pay as a friend** | Use the pay link the bot sends and log in with a PayPal sandbox **personal** account (credentials are shown inside the simulator) |
+
+> The free Render instance sleeps when idle. The first message after a pause can take ~50 seconds; later ones are fast.
 
 ## The problem
 
-Across East Africa (and the diaspora), money for life events is collected in WhatsApp groups. One person collects by hand, keeps a list in a notebook, chases pledges one by one, and posts screenshots to prove what came in and where it went. That takes a lot of time, it's error-prone, and trust is fragile.
+Across East Africa and the diaspora, money for weddings, funerals, hospital bills and school fees is collected in WhatsApp groups. One person collects by hand, keeps a list in a notebook, chases pledges one by one, and posts screenshots to prove what came in and where it went. It takes hours, mistakes happen, and trust breaks easily.
 
 ## What SarafuPay does
 
 | Who | In chat | Behind the scenes |
 |---|---|---|
-| **Organiser** | "I want to collect $1,500 for my sister's wedding by 20 Dec" | AI onboards them in chat (name, goal, deadline) and creates the collection code + a forwardable invite |
-| **Friends** | Tap the invite → "Contribute NEEMA24" → "$40" | AI creates a **PayPal order** and sends a pay link; receipt + organiser alert after capture |
-| **Pledgers** | "I'll pay $25 on Friday" | Pledge recorded; organiser can send **WhatsApp reminders** or a **PayPal invoice + QR** (Agent Toolkit) |
-| **Organiser** | "Who hasn't paid?" / "How much do we have?" | AI answers from live data |
-| **Organiser** | "Pay Mama Lishe $300 for catering" | AI prepares a **PayPal Payout**; money moves **only** when the organiser replies `CONFIRM <6-digit code>` (never via the LLM) |
-| **Everyone** | – | Every payout is broadcast to contributors as a **transparency update** and listed on the public page |
-| **Treasurer** | Private dashboard | **AG Studio** dashboard + a custom **Treasurer agent** that delegates to Studio's built-in agents |
+| **Organiser** | "Nataka kuchangisha $1,500 kwa harusi ya dada yangu hadi 20 Desemba" | AI onboards them in chat and creates a collection code plus a forwardable invite with a `wa.me` link |
+| **Friends** | Tap the invite → "Contribute NEEMA24" → "$40" | AI creates a **PayPal order** and sends a pay link; receipt to the friend and alert to the organiser after capture |
+| **Pledgers** | "I'll pay $25 on Friday" | Pledge recorded; organiser can send **reminders** or a **PayPal invoice + QR** (Agent Toolkit) |
+| **Organiser** | "Who hasn't paid?" / "Tuna kiasi gani?" | AI answers from live data |
+| **Organiser** | "Pay Mama Lishe $300 for catering" | AI prepares a **PayPal Payout**; money moves **only** after the organiser replies `CONFIRM <6-digit code>`, a step the LLM never touches |
+| **Everyone** | – | Every payout is broadcast to contributors as a **transparency update** and listed on the public page `/c/CODE` |
+| **Treasurer** | Private dashboard `/d/CODE` | **AG Studio** dashboard with a custom **Treasurer agent** that delegates to Studio's built-in agents |
 
-Voice notes and Swahili work too: the agent replies in the user's language.
+### Speaks the user's language
+
+- Replies in **Swahili or English**, matching what the user writes (Tanzanian numbers default to Swahili until they write in English).
+- Receipts, alerts, reminders, payout confirmations and transparency updates are all bilingual.
+- Output uses native WhatsApp formatting (`*bold*`, `_italic_`), and voice notes are transcribed and answered.
 
 ## Architecture
 
@@ -33,16 +61,23 @@ Public page (/c/CODE) ─────┘   Gemini via        ├─ PayPal Agent
 Treasurer dashboard (/d/CODE) ─► AG Studio + Studio Agent Framework ─► /api/studio/llm (Gemini proxy)
 ```
 
-- `lib/agent/`: system prompt, guarded domain tools, the engine (per-user queue, chat memory, voice notes). `CONFIRM`/`CANCEL` codes are handled before the LLM.
-- `lib/paypal/`: Orders via `@paypal/paypal-server-sdk` (APIMatic-generated), Payouts + webhook verification via REST, and **Agent Toolkit** tools re-wrapped for AI SDK v7.
-- `lib/services/core.ts`: collections, contributions (idempotent capture), pledges, payouts and the transparency broadcast.
-- `app/d/[code]`: AG Studio with branded theme, initial report, custom `Treasurer` agent + custom tools (`collection_summary`, `remind_pledgers`) and AG's five built-in agents, all running on Gemini through a custom `AgLlmAdapter`.
+| Path | What lives there |
+|---|---|
+| `lib/agent/` | System prompt, guarded domain tools, the engine (per-user queue, chat memory, voice notes), Gemini model fallback chain |
+| `lib/paypal/` | Orders via `@paypal/paypal-server-sdk` (APIMatic-generated), Payouts + webhook verification via REST, Agent Toolkit tools re-wrapped for AI SDK v7 |
+| `lib/services/` | Collections, idempotent captures, pledges, payouts, transparency broadcast, share links |
+| `lib/channels/` | WhatsApp Cloud API sender and the simulator channel, with WhatsApp formatting applied on send |
+| `lib/i18n.ts` | Swahili/English detection and bilingual message helpers |
+| `app/api/whatsapp` | Signed Meta webhook with message-ID de-duplication (Meta retries on slow responses) |
+| `app/d/[code]` | AG Studio with branded theme, custom `Treasurer` agent and tools, running on Gemini via a custom `AgLlmAdapter` |
 
 ### Safety by design
 
-- The LLM can **prepare** a payout but cannot execute one. Execution requires the owner's own number to send a one-time code (15-minute expiry, single use, balance re-checked, PayPal idempotency key).
-- Role-based privacy: only the organiser sees contributor names; others see totals and the payout ledger.
-- PayPal and Meta webhooks are signature-verified. The Agent Toolkit is pinned to `sandbox: true`.
+- **The LLM cannot move money.** It can only *prepare* a payout. Execution needs a one-time code from the organiser's own number (15-minute expiry, single use, balance re-checked, PayPal idempotency key).
+- **Role-based privacy.** Only the organiser sees contributor names; everyone else sees totals and the payout ledger.
+- **Verified webhooks.** PayPal and Meta signatures are checked; duplicate WhatsApp deliveries are ignored so nobody gets double replies.
+- **Sandbox pinned.** The Agent Toolkit is forced to `sandbox: true`.
+- **Resilient AI.** If a Gemini model is overloaded or rate-limited, the agent falls back through `gemini-3.8-flash` → `3.6-flash` → `3.5-flash` → `3.5-flash-lite`.
 
 ## Run it locally (5 minutes)
 
@@ -50,9 +85,9 @@ Requires Node 20.9+.
 
 ```bash
 npm install
-cp env.example .env.local     # fill PAYPAL_CLIENT_ID/PAYPAL_SECRET (sandbox) + GEMINI_API_KEY
+cp env.example .env.local     # fill PAYPAL_CLIENT_ID / PAYPAL_SECRET (sandbox) + GEMINI_API_KEY
 npm run seed                  # optional: demo collection with contributions, pledges and a payout
-npm run dev                   # http://localhost:3000  → open /chat
+npm run dev                   # http://localhost:3000 → open /chat
 npm test                      # end-to-end flow test (mock LLM, in-memory Postgres, stubbed PayPal)
 ```
 
@@ -63,22 +98,32 @@ No database setup is needed locally: without `DATABASE_URL` the app uses embedde
 | Service | Where | Env |
 |---|---|---|
 | PayPal sandbox app | developer.paypal.com → Apps & Credentials (Sandbox) | `PAYPAL_CLIENT_ID`, `PAYPAL_SECRET` |
-| PayPal webhook | Same app → Webhooks → `https://<app>/api/paypal/webhook`, events: `CHECKOUT.ORDER.APPROVED`, `PAYMENT.CAPTURE.COMPLETED`, `PAYMENT.PAYOUTS-ITEM.*`, `INVOICING.INVOICE.PAID` | `PAYPAL_WEBHOOK_ID` |
-| Gemini | aistudio.google.com/apikey (free tier) | `GEMINI_API_KEY` |
-| WhatsApp Cloud API | developers.facebook.com → WhatsApp → API Setup; webhook `https://<app>/api/whatsapp`, field `messages` | `WHATSAPP_*` |
-| AG Studio (optional) | Trial key from AG Grid (removes watermark) | `NEXT_PUBLIC_AG_STUDIO_LICENSE_KEY` |
+| PayPal webhook (optional) | Same app → Webhooks → `https://<app>/api/paypal/webhook` | `PAYPAL_WEBHOOK_ID` |
+| Gemini | aistudio.google.com/apikey | `GEMINI_API_KEY`, `GEMINI_MODEL` |
+| WhatsApp Cloud API (optional) | See [docs/WHATSAPP_SETUP.md](docs/WHATSAPP_SETUP.md) | `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_DISPLAY_NUMBER` |
+| AG Studio (optional) | Trial key from AG Grid (removes the watermark) | `NEXT_PUBLIC_AG_STUDIO_LICENSE_KEY` |
+
+Without WhatsApp keys everything still works through the `/chat` simulator.
 
 ## Deploy on Render
 
-`render.yaml` provisions the web service + Postgres. **New → Blueprint** → pick this repo → fill the `sync: false` secrets → set `APP_URL` to the service URL → point the PayPal and Meta webhooks at it. `/api/health` reports which integrations are configured.
+`render.yaml` provisions the web service and Postgres. **New → Blueprint** → pick this repo → fill the `sync: false` secrets → set `APP_URL` to the service URL → point the PayPal and Meta webhooks at it. `/api/health` reports which integrations are configured.
 
-## For judges: how to test
+## For judges: a 3-minute test
 
-1. Open **`/chat`** (WhatsApp simulator: same agent, same PayPal sandbox as WhatsApp).
-2. As **Organiser**: "Hi, I want to start a collection for my sister's wedding, $500".
-3. Switch to **Friend · Amina** → "Contribute CODE" → "$20" → open the link → pay with a PayPal sandbox **personal** account.
-4. Back as Organiser: see the alert, ask "who has paid?", then "pay caterer@example.com $10 for the deposit" and reply with the `CONFIRM` code.
-5. Ask for the dashboard link to open the AG Studio treasurer dashboard.
+1. Open **[/chat](https://sarafupay-ai.onrender.com/chat)** (or message the WhatsApp number above).
+2. As **Organiser**: `Hi, I want to start a collection for my sister's wedding, $500 by 20 December`.
+3. Switch to **Friend · Amina** → `Contribute <CODE>` → `$20` → open the link → pay with the sandbox buyer shown in the simulator.
+4. Back as Organiser: see the alert, ask `who has paid?`, then `pay caterer@example.com $10 for the deposit` and reply with the `CONFIRM` code.
+5. Watch the transparency update arrive for Amina, then ask for the **dashboard link** to open the AG Studio treasurer dashboard.
+
+Try it in Swahili too: `Habari, nataka kuanzisha mchango wa msiba, lengo $200`.
+
+## Tests
+
+`npm test` runs the whole money flow end to end with a scripted LLM, in-memory Postgres and a stubbed PayPal API:
+
+collection created · payment link · capture settled once (idempotent) with receipt + organiser alert · Swahili receipt for a Tanzanian contributor · pledge + reminder · non-owner payout blocked · over-balance payout blocked · payout executed once by CONFIRM code (wrong code and replay rejected) · transparency broadcast · privacy for non-owners.
 
 ## Built with
 
@@ -86,8 +131,10 @@ PayPal Orders v2 · PayPal Payouts · PayPal Invoicing & Orders via **PayPal Age
 
 ## Roadmap
 
-Mobile money (M-Pesa, Airtel Money) collection and payouts · recurring contributions (vikoba/chama) · multi-organiser approvals for NGOs.
+- Mobile money (M-Pesa, Airtel Money) collection and payouts alongside PayPal
+- Approved WhatsApp message templates for reminders outside the 24-hour window
+- Recurring contributions (vikoba / chama) and multi-organiser approvals for NGOs
 
 ## License
 
-MIT, see [LICENSE](LICENSE).
+MIT, see [LICENSE](LICENSE). Made in Dodoma, Tanzania by Ezekiel Lemana.
