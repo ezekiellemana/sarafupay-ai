@@ -45,7 +45,7 @@ function initialState(currency: string): AgReportState {
         id: "overview",
         widgets: {
           raised: v("raised", "contributions.amount", `Raised (${currency})`),
-          count: v("count", "contributions.contributor", "Contributions", "count"),
+          count: v("count", "contributions.payments", "Contributions"),
           paidout: v("paidout", "payouts.amount", `Paid out (${currency})`),
           pledged: v("pledged", "pledges.amount", `Pledged (${currency})`),
           byday: {
@@ -78,6 +78,19 @@ function initialState(currency: string): AgReportState {
             },
             format: { title: { enabled: true, text: "Contributions ledger" } },
           },
+          pledgeLedger: {
+            type: "grid",
+            dataMapping: {
+              cols: [
+                { id: "pledges.pledger" },
+                { id: "pledges.amount" },
+                { id: "pledges.due" },
+                { id: "pledges.status" },
+                { id: "pledges.reminded" },
+              ],
+            },
+            format: { title: { enabled: true, text: "Open pledges" } },
+          },
           payouts: {
             type: "grid",
             dataMapping: {
@@ -99,8 +112,9 @@ function initialState(currency: string): AgReportState {
           pledged: { xTrack: 18, yTrack: 0, xSpan: 6, ySpan: 5 },
           byday: { xTrack: 0, yTrack: 5, xSpan: 15, ySpan: 12 },
           bychannel: { xTrack: 15, yTrack: 5, xSpan: 9, ySpan: 12 },
-          ledger: { xTrack: 0, yTrack: 17, xSpan: 14, ySpan: 14 },
-          payouts: { xTrack: 14, yTrack: 17, xSpan: 10, ySpan: 14 },
+          ledger: { xTrack: 0, yTrack: 17, xSpan: 24, ySpan: 12 },
+          pledgeLedger: { xTrack: 0, yTrack: 29, xSpan: 11, ySpan: 12 },
+          payouts: { xTrack: 11, yTrack: 29, xSpan: 13, ySpan: 12 },
         },
       },
     ],
@@ -124,7 +138,7 @@ export default function StudioInner({ code, ownerKey, currency, data, licenseKey
   const sources = useMemo(
     () => ({
       sources: [
-        { id: "contributions", data: data.contributions.length ? data.contributions : [{ contributor: "(none yet)", amount: 0, channel: "-", paid_on: "", message: "", paypal_ref: "" }] },
+        { id: "contributions", data: data.contributions.length ? data.contributions.map((c) => ({ ...c, payments: 1 })) : [{ contributor: "(none yet)", amount: 0, channel: "-", paid_on: "", message: "", paypal_ref: "", payments: 0 }] },
         { id: "pledges", data: data.pledges.length ? data.pledges : [{ pledger: "(none)", amount: 0, due: "", status: "-", reminded: "no" }] },
         { id: "payouts", data: data.payouts.length ? data.payouts : [{ recipient: "(none yet)", amount: 0, purpose: "", status: "-", sent_on: "" }] },
       ],
