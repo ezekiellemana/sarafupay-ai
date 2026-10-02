@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { generateText, isStepCount, jsonSchema, tool, type ModelMessage, type Tool } from "ai";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { withGeminiFallback } from "@/lib/agent/models";
 import type { AgAiConversationItem, AgLlmRequest, AgLlmResponse, AgAiOutputItem } from "ag-studio";
 import { env } from "@/lib/env";
 import { ownerCollection } from "@/lib/studio/auth";
@@ -95,11 +95,13 @@ export async function POST(req: Request) {
   for (const t of body.tools ?? []) {
     tools[t.name] = tool({ description: t.description, inputSchema: jsonSchema(clean(t.parameters) as never) });
   }
-  const google = createGoogleGenerativeAI({ apiKey: env.geminiApiKey() });
   const id = `resp_${crypto.randomUUID()}`;
   try {
-    const result = await generateText({
-      model: google(env.geminiModel()),
+    let usedModel = env.geminiModel();
+    const result = await withGeminiFallback((model, modelId) => {
+      usedModel = modelId;
+      return generateText({
+      model,
       system: [body.instructions, ...system].filter(Boolean).join("\n\n") || undefined,
       messages: messages.length ? messages : [{ role: "user", content: "Hello" }],
       tools: Object.keys(tools).length ? tools : undefined,
@@ -109,6 +111,8 @@ export async function POST(req: Request) {
           : (body.toolChoice as "auto" | "none" | "required" | undefined),
       stopWhen: isStepCount(1),
       temperature: 0.2,
+      maxRetries: 1,
+      });
     });
     const output: AgAiOutputItem[] = [];
     if (result.text) {
@@ -137,7 +141,7 @@ export async function POST(req: Request) {
       createdAt: Date.now(),
       output,
       status: "completed",
-      model: env.geminiModel(),
+      model: usedModel,
       usage: result.usage
         ? ({ inputTokens: result.usage.inputTokens ?? 0, outputTokens: result.usage.outputTokens ?? 0 } as never)
         : undefined,
