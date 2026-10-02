@@ -73,13 +73,26 @@ export function Simulator({ buyer }: { buyer: { email: string; password: string 
     if (t) setDraft(t);
   }, [search]);
 
+  const polling = useRef(false);
   const poll = useCallback(async () => {
-    const res = await fetch(`/api/sim/inbox?phone=${me.phone}&after=${lastId.current}`, { cache: "no-store" });
-    if (!res.ok) return;
-    const { messages } = (await res.json()) as { messages: Msg[] };
-    if (!messages.length) return;
-    lastId.current = messages[messages.length - 1].id;
-    setMsgs((prev) => [...prev.filter((m) => !m.pending), ...messages]);
+    if (polling.current) return; // never overlap polls (slow AI replies caused duplicates)
+    polling.current = true;
+    try {
+      const phone = me.phone;
+      const res = await fetch(`/api/sim/inbox?phone=${phone}&after=${lastId.current}`, { cache: "no-store" });
+      if (!res.ok) return;
+      const { messages } = (await res.json()) as { messages: Msg[] };
+      if (!messages.length) return;
+      lastId.current = Math.max(lastId.current, messages[messages.length - 1].id);
+      setMsgs((prev) => {
+        const seen = new Set(prev.filter((m) => !m.pending).map((m) => m.id));
+        const fresh = messages.filter((m) => !seen.has(m.id));
+        const hasIn = fresh.some((m) => m.direction === "in");
+        return [...prev.filter((m) => !(m.pending && hasIn)), ...fresh];
+      });
+    } finally {
+      polling.current = false;
+    }
   }, [me.phone]);
 
   useEffect(() => {
