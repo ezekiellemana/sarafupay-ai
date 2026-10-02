@@ -1,11 +1,12 @@
 # Render Blueprint — https://render.com/docs/blueprint-spec
-# Paid plans are used on purpose: free web services sleep (slow WhatsApp replies) and
-# free Postgres expires after 30 days, before judging ends. The hackathon's $50 Render credit covers it.
+# Free plans to start. Note: free web services sleep when idle (first WhatsApp reply can take ~1 min)
+# and free Postgres expires after 30 days. Before judging (Nov 13–Dec 15), apply the $50 hackathon credit
+# and upgrade both plans so the demo stays fast and the database does not expire.
 services:
   - type: web
     name: sarafupay-ai
     runtime: node
-    plan: starter
+    plan: free
     region: frankfurt
     buildCommand: npm ci && npm run build
     startCommand: npm run start
@@ -50,6 +51,6 @@ services:
 
 databases:
   - name: sarafupay-db
-    plan: basic-256mb
+    plan: free
     region: frankfurt
     postgresMajorVersion: "16"
