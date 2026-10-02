@@ -175,11 +175,12 @@ export function buildTools(ctx: AgentContext): Record<string, Tool> {
         message: z.string().max(280).optional().describe("Optional note to the organiser"),
       }),
       execute: safe(async (i) => {
+        await refreshUser();
         const col = await mustFind(i.code);
         const ctb = await core.createContribution({
           collection: col,
           contributorId: ctx.user.id,
-          displayName: i.display_name ?? ctx.user.name ?? "Anonymous",
+          displayName: i.display_name?.trim() || ctx.user.name || "Anonymous",
           amountCents: toCents(i.amount),
           source: ctx.channel,
           message: i.message,
@@ -194,13 +195,19 @@ export function buildTools(ctx: AgentContext): Record<string, Tool> {
 
     make_pledge: tool({
       description: "Record a promise to pay later (pledge). The organiser is notified and can send reminders.",
-      inputSchema: z.object({ code, amount, due_date: date.optional() }),
+      inputSchema: z.object({
+        code,
+        amount,
+        due_date: date.optional(),
+        display_name: z.string().max(80).optional().describe("Pledger's name if they gave it in this message; defaults to their saved name"),
+      }),
       execute: safe(async (i) => {
         const col = await mustFind(i.code);
+        await refreshUser(); // a parallel update_my_profile call may have just saved the name
         const p = await core.createPledge({
           collection: col,
           user: ctx.user,
-          displayName: ctx.user.name ?? "Anonymous",
+          displayName: i.display_name?.trim() || ctx.user.name || "Anonymous",
           amountCents: toCents(i.amount),
           dueDate: i.due_date,
         });
