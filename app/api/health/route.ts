@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { env, paypalConfigured, whatsappConfigured } from "@/lib/env";
 import { getDb } from "@/lib/db";
 import { sql } from "drizzle-orm";
+import { aiUsageToday } from "@/lib/limits";
 
 export async function GET() {
   let db = false;
@@ -19,6 +20,7 @@ export async function GET() {
       gemini: Boolean(env.geminiApiKey()),
       whatsapp: whatsappConfigured(),
       simulator: env.simulatorEnabled(),
+      ai_today: aiUsageToday(),
     },
     { status: db ? 200 : 503 },
   );
