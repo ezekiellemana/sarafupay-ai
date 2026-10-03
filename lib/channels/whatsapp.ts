@@ -39,6 +39,34 @@ export async function sendWhatsAppText(toDigits: string, body: string): Promise<
   return { ok: true };
 }
 
+/**
+ * Sends an approved message template. Templates are the only messages WhatsApp delivers
+ * outside the 24-hour window (e.g. pledge reminders to people who haven't written lately).
+ * `body` fills {{1}}, {{2}}, … in the body; `urlSuffix` fills the dynamic part of the first URL button.
+ */
+export async function sendWhatsAppTemplate(
+  toDigits: string,
+  name: string,
+  language: string,
+  body: string[],
+  urlSuffix?: string,
+): Promise<SendResult> {
+  if (!whatsappConfigured()) return { ok: false, reason: "not_configured" };
+  const components: unknown[] = [{ type: "body", parameters: body.map((text) => ({ type: "text", text: text.slice(0, 1000) })) }];
+  if (urlSuffix) components.push({ type: "button", sub_type: "url", index: "0", parameters: [{ type: "text", text: urlSuffix }] });
+  const res = await fetch(`${graph()}/${env.waPhoneNumberId()}/messages`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${env.waToken()}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ messaging_product: "whatsapp", to: toDigits, type: "template", template: { name, language: { code: language }, components } }),
+  });
+  if (!res.ok) {
+    const detail = await res.text();
+    console.error("[whatsapp] template send failed", res.status, detail);
+    return { ok: false, reason: "error", detail: detail.slice(0, 300) };
+  }
+  return { ok: true };
+}
+
 export async function markRead(messageId: string): Promise<void> {
   if (!whatsappConfigured()) return;
   await fetch(`${graph()}/${env.waPhoneNumberId()}/messages`, {
