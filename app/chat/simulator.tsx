@@ -71,6 +71,8 @@ export function Simulator({ buyer }: { buyer: { email: string; password: string 
   const [ready, setReady] = useState(false);
   const [sheet, setSheet] = useState(false);
   const [newName, setNewName] = useState("");
+  const [menu, setMenu] = useState(false);
+  const [adding, setAdding] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
 
@@ -168,6 +170,18 @@ export function Simulator({ buyer }: { buyer: { email: string; password: string 
     }
   }, [msgs, busy]);
 
+  useEffect(() => {
+    if (!menu && !adding && !sheet) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setMenu(false);
+      setAdding(false);
+      setSheet(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [menu, adding, sheet]);
+
   async function send(text: string) {
     const body = text.trim();
     if (!body || busy || !ready) return;
@@ -198,16 +212,25 @@ export function Simulator({ buyer }: { buyer: { email: string; password: string 
     setActive(id);
     write(ACTIVE_KEY, id);
     setSheet(false);
+    setMenu(false);
   }
 
-  function addPerson() {
-    const label = newName.trim().slice(0, 24);
+  function openAdd() {
+    setMenu(false);
+    setSheet(false);
+    setNewName("");
+    setAdding(true);
+  }
+
+  function addPerson(name = newName) {
+    const label = name.trim().slice(0, 24);
     if (!label) return;
-    const p: Persona = { id: `p-${Math.random().toString(36).slice(2, 8)}`, label, hint: "Extra test person" };
+    const p: Persona = { id: newPersonId(), label, hint: "Extra test person" };
     const next = [...custom, p];
     setCustom(next);
     write(CUSTOM_KEY, next);
     setNewName("");
+    setAdding(false);
     choose(p.id);
   }
 
@@ -236,55 +259,47 @@ export function Simulator({ buyer }: { buyer: { email: string; password: string 
         ? ["Who has paid so far?", "Who hasn't paid yet?", "Send reminders to pledgers", "Send me the dashboard link"]
         : ["How much is left to reach the goal?", "I'll pay $20 on Friday", "Where did the money go?"];
 
-  const panel = (
-    <>
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-widest text-ink-soft">Chat as</p>
-        <ul className="mt-3 space-y-1.5">
-          {people.map((p) => (
-            <li key={p.id}>
-              <button
-                onClick={() => choose(p.id)}
-                aria-pressed={p.id === active}
-                className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-colors ${
-                  p.id === active ? "bg-forest text-paper" : "hover:bg-paper-2"
-                }`}
-              >
-                <span
-                  className={`grid h-8 w-8 shrink-0 place-items-center rounded-full font-semibold ${
-                    p.id === active ? "bg-marigold text-ink" : "bg-paper-2 text-ink"
-                  }`}
-                >
-                  {initials(p.label)}
-                </span>
-                <span className="min-w-0">
-                  <span className="block font-semibold">{p.label}</span>
-                  <span className="block truncate text-xs opacity-75">{phones[p.id] ? `+${phones[p.id]}` : p.hint}</span>
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            addPerson();
-          }}
-          className="mt-3 flex gap-2"
-        >
-          <input
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            placeholder="Add a person…"
-            aria-label="New test person name"
-            className="min-w-0 flex-1 rounded-full border border-line bg-white px-3 py-2 text-base sm:text-sm"
-          />
-          <button disabled={!newName.trim()} className="rounded-full bg-forest-2 px-3 text-sm font-medium text-paper disabled:opacity-40">
-            Add
-          </button>
-        </form>
-      </div>
+  const avatar = (p: Persona, on: boolean) => (
+    <span
+      className={`grid h-8 w-8 shrink-0 place-items-center rounded-full font-semibold ${on ? "bg-marigold text-ink" : "bg-paper-2 text-ink"}`}
+    >
+      {initials(p.label)}
+    </span>
+  );
 
+  const peopleList = (
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-widest text-ink-soft">Chat as</p>
+      <ul className="mt-3 space-y-1.5">
+        {people.map((p) => (
+          <li key={p.id}>
+            <button
+              onClick={() => choose(p.id)}
+              aria-pressed={p.id === active}
+              className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-colors ${
+                p.id === active ? "bg-forest text-paper" : "hover:bg-paper-2"
+              }`}
+            >
+              {avatar(p, p.id === active)}
+              <span className="min-w-0">
+                <span className="block font-semibold">{p.label}</span>
+                <span className="block truncate text-xs opacity-75">{phones[p.id] ? `+${phones[p.id]}` : p.hint}</span>
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      <button
+        onClick={openAdd}
+        className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-line py-2.5 text-sm font-medium text-forest-2 transition-colors hover:bg-paper-2"
+      >
+        <span aria-hidden>＋</span> Add person
+      </button>
+    </div>
+  );
+
+  const helpPanel = (
+    <>
       <div className="text-sm leading-relaxed text-ink-soft">
         <p className="font-semibold text-ink">How to test</p>
         <ol className="mt-2 list-decimal space-y-1 pl-4">
@@ -335,7 +350,10 @@ export function Simulator({ buyer }: { buyer: { email: string; password: string 
         {/* Desktop side panel */}
         <aside className="hidden w-72 shrink-0 flex-col gap-4 overflow-y-auto lg:flex">
           <Logo />
-          <div className="card space-y-5 p-4">{panel}</div>
+          <div className="card space-y-5 p-4">
+            {peopleList}
+            {helpPanel}
+          </div>
         </aside>
 
         {/* Chat: full-bleed on phones, framed on larger screens */}
@@ -347,15 +365,57 @@ export function Simulator({ buyer }: { buyer: { email: string; password: string 
               <p className="font-semibold leading-tight">SarafuPay</p>
               <p className="truncate text-xs opacity-80">{busy ? "typing…" : "AI agent · same brain as WhatsApp"}</p>
             </div>
-            <button
-              onClick={() => setSheet(true)}
-              className="flex items-center gap-2 rounded-full bg-forest-2 py-1 pl-1 pr-3 text-sm lg:hidden"
-              aria-label={`Chatting as ${me.label}. Change person`}
-            >
-              <span className="grid h-7 w-7 place-items-center rounded-full bg-marigold font-semibold text-ink">{initials(me.label)}</span>
-              <span className="max-w-[6.5rem] truncate">{me.label}</span>
-              <span aria-hidden>▾</span>
-            </button>
+            <div className="relative lg:hidden">
+              <button
+                onClick={() => setMenu((m) => !m)}
+                className="flex items-center gap-2 rounded-full bg-forest-2 py-1 pl-1 pr-3 text-sm transition-colors active:bg-forest"
+                aria-haspopup="menu"
+                aria-expanded={menu}
+                aria-label={`Chatting as ${me.label}. Change person`}
+              >
+                <span className="grid h-7 w-7 place-items-center rounded-full bg-marigold font-semibold text-ink">{initials(me.label)}</span>
+                <span className="max-w-[6.5rem] truncate">{me.label}</span>
+                <span aria-hidden className={`text-xs transition-transform duration-200 ${menu ? "rotate-180" : ""}`}>▾</span>
+              </button>
+              {menu ? <button className="fixed inset-0 z-30 cursor-default" aria-label="Close menu" onClick={() => setMenu(false)} /> : null}
+              <div className={`menu-pop ${menu ? "open" : ""}`} role="menu" inert={!menu}>
+                <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-widest text-ink-soft">Chat as</p>
+                {people.map((p) => (
+                  <button
+                    key={p.id}
+                    role="menuitemradio"
+                    aria-checked={p.id === active}
+                    onClick={() => choose(p.id)}
+                    className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-ink transition-colors ${
+                      p.id === active ? "bg-paper-2" : "active:bg-paper-2"
+                    }`}
+                  >
+                    {avatar(p, p.id === active)}
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-semibold">{p.label}</span>
+                      <span className="block truncate text-xs text-ink-soft">{phones[p.id] ? `+${phones[p.id]}` : p.hint}</span>
+                    </span>
+                    {p.id === active ? <span className="text-forest-2" aria-hidden>✓</span> : null}
+                  </button>
+                ))}
+                <div className="my-1.5 border-t border-line" />
+                <button role="menuitem" onClick={openAdd} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-forest-2 active:bg-paper-2">
+                  <span className="grid h-8 w-8 place-items-center rounded-full border border-dashed border-forest-2" aria-hidden>＋</span>
+                  Add person
+                </button>
+                <button
+                  role="menuitem"
+                  onClick={() => {
+                    setMenu(false);
+                    setSheet(true);
+                  }}
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-ink active:bg-paper-2"
+                >
+                  <span className="grid h-8 w-8 place-items-center rounded-full bg-paper-2" aria-hidden>?</span>
+                  Help, sandbox login &amp; reset
+                </button>
+              </div>
+            </div>
           </header>
 
           <div ref={scroller} className="chat-scroll flex-1 space-y-2 overflow-y-auto overscroll-contain px-3 py-4 sm:px-6">
@@ -433,21 +493,81 @@ export function Simulator({ buyer }: { buyer: { email: string; password: string 
         </section>
       </div>
 
-      {/* Mobile bottom sheet: people, help and reset */}
+      {/* Mobile bottom sheet: help, sandbox login and reset */}
       <div className={`sheet-backdrop lg:hidden ${sheet ? "open" : ""}`} onClick={() => setSheet(false)} aria-hidden />
       <div
         className={`sheet lg:hidden ${sheet ? "open" : ""}`}
         role="dialog"
         aria-modal="true"
-        aria-label="Test people and help"
+        aria-label="Help and settings"
         inert={!sheet}
       >
         <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-line" />
-        <div className="space-y-5">{panel}</div>
+        <div className="space-y-5">{helpPanel}</div>
         <button onClick={() => setSheet(false)} className="btn btn-primary mt-5 w-full justify-center">
           Done
         </button>
       </div>
+
+      {/* Add-person dialog */}
+      <div className={`dialog-backdrop ${adding ? "open" : ""}`} onClick={() => setAdding(false)} aria-hidden />
+      <div className={`dialog ${adding ? "open" : ""}`} role="dialog" aria-modal="true" aria-labelledby="add-title" inert={!adding}>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            addPerson();
+          }}
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 id="add-title" className="font-display text-2xl font-semibold">Add a test person</h2>
+              <p className="mt-1 text-sm text-ink-soft">They get their own private test number, so you can chat as them.</p>
+            </div>
+            <button type="button" onClick={() => setAdding(false)} className="grid h-9 w-9 shrink-0 place-items-center rounded-full hover:bg-paper-2" aria-label="Close">
+              ✕
+            </button>
+          </div>
+          <label className="mt-5 block text-sm font-medium">
+            Name
+            <input
+              key={adding ? "open" : "closed"}
+              autoFocus={adding}
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              maxLength={24}
+              placeholder="e.g. Baraka"
+              enterKeyHint="done"
+              className="mt-1.5 w-full rounded-xl border border-line bg-white px-3.5 py-3 text-base outline-none focus:border-forest"
+            />
+          </label>
+          <p className="mt-4 text-xs font-semibold uppercase tracking-widest text-ink-soft">Quick picks</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {["Baraka", "Grace", "Mama Lishe", "Juma"].map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => addPerson(n)}
+                className="rounded-full bg-paper-2 px-3 py-1.5 text-sm ring-1 ring-line transition-colors hover:bg-paper"
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+          <div className="mt-6 flex gap-3">
+            <button type="button" onClick={() => setAdding(false)} className="btn btn-ghost flex-1 justify-center">
+              Cancel
+            </button>
+            <button disabled={!newName.trim()} className="btn btn-primary flex-1 justify-center disabled:opacity-40">
+              Add &amp; chat
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
+}
+
+/** Short random id for a custom test person (only ever called from event handlers). */
+function newPersonId(): string {
+  return `p-${Math.random().toString(36).slice(2, 8)}`;
 }
