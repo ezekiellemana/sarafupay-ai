@@ -6,14 +6,11 @@ import { Logo, Progress, SandboxBadge } from "@/components/brand";
 import { collectionStats, findCollection, getUser, listPayouts, searchSupporters, type Supporter } from "@/lib/services/core";
 import { money } from "@/lib/format";
 import { waLink } from "@/lib/channels/whatsapp";
-import { simulatorUrl } from "@/lib/services/links";
+import { categoryEmoji, simulatorUrl } from "@/lib/services/links";
 import { contributeAction } from "./actions";
 import { AmountInput } from "./amount-input";
 import { SupporterSearch } from "./supporter-search";
 
-const categoryEmoji: Record<string, string> = {
-  wedding: "💍", funeral: "🕊️", medical: "🩺", education: "🎓", community: "🏘️", nonprofit: "🤝", celebration: "🎉", other: "✨",
-};
 
 export default async function CollectionPage({ params, searchParams }: PageProps<"/c/[code]">) {
   await connection();
@@ -43,7 +40,7 @@ export default async function CollectionPage({ params, searchParams }: PageProps
       <main className="mx-auto grid max-w-5xl grid-cols-1 gap-8 px-5 pb-20 sm:px-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
         <section className="rise min-w-0">
           <p className="font-mono text-xs uppercase tracking-[0.2em] text-ink-soft">
-            {categoryEmoji[col.category] ?? "✨"} {col.category} · code {col.code}
+            {categoryEmoji(col.category)} {col.category} · code {col.code}
           </p>
           <h1 className="font-display mt-3 break-words text-[2.25rem] font-semibold leading-tight sm:text-6xl">{col.title}</h1>
           {col.purpose ? <p className="mt-4 max-w-xl text-lg text-ink-soft leading-relaxed">{col.purpose}</p> : null}
