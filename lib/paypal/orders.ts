@@ -104,8 +104,3 @@ export async function captureOrder(orderId: string): Promise<CaptureResult> {
     throw e;
   }
 }
-
-export async function getOrder(orderId: string): Promise<CaptureResult> {
-  const { result } = await new OrdersController(paypalSdk()).getOrder({ id: orderId });
-  return summarize(result);
-}
