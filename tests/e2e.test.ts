@@ -36,6 +36,8 @@ const model = new MockLanguageModelV4({
 // --- PayPal REST stub (OAuth + Payouts) ---
 const realFetch = globalThis.fetch;
 const payoutCalls: unknown[] = [];
+let templateApproved = false; // flips mid-test to simulate Meta approving the reminder template
+const templateCalls: { to: string; template: { name: string; language: { code: string }; components: { type: string; parameters: { text: string }[] }[] } }[] = [];
 globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = String(input instanceof Request ? input.url : input);
   if (url.includes("api-m.sandbox.paypal.com")) {
@@ -49,6 +51,13 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     throw new Error(`unexpected PayPal call ${url}`);
   }
   if (url.includes("graph.facebook.com")) {
+    const msg = init?.body ? JSON.parse(String(init.body)) : {};
+    if (msg.type === "template") {
+      templateCalls.push(msg);
+      return templateApproved
+        ? Response.json({ messages: [{ id: "wamid.T1" }] })
+        : Response.json({ error: { code: 132001, message: "Template name does not exist in the translation" } }, { status: 404 });
+    }
     // Simulate Meta refusing free-form text outside the 24h customer-service window.
     return Response.json({ error: { code: 131047, message: "Re-engagement message" } }, { status: 400 });
   }
@@ -153,6 +162,19 @@ async function main() {
   const [gp] = await db.select().from(schema.pledges).where(eq(schema.pledges.userId, grace.id));
   assert.equal(gp.remindedAt, null, "remindedAt stays empty when WhatsApp refused");
   console.log("✓ refused WhatsApp reminder is not marked as sent; organiser gets the pay link");
+
+  // 4c. Once the reminder template is approved, people outside the 24h window still get reminded
+  templateApproved = true;
+  const r2 = await core.remindPledgers(col);
+  assert.ok(r2.reminded.includes("Grace") && !r2.unreachable.some((u) => u.name === "Grace"), "Grace reminded via template");
+  const tc = templateCalls.at(-1)!;
+  assert.equal(tc.to, GRACE);
+  assert.equal(tc.template.name, "pledge_reminder");
+  assert.deepEqual(tc.template.components[0].parameters.map((p) => p.text), ["Grace", "$15.00", col.title, "2026-12-01"]);
+  assert.match(tc.template.components[1].parameters[0].text, /^ctb_/, "pay button carries the contribution id");
+  const [gp2] = await db.select().from(schema.pledges).where(eq(schema.pledges.userId, grace.id));
+  assert.ok(gp2.remindedAt, "remindedAt set once the template is delivered");
+  console.log("✓ outside 24h: approved template delivers the reminder with a PayPal pay button");
 
   // 5. Non-owner cannot pay out
   script.push({ tool: ["prepare_payout", { code: col.code, recipient_email: "x@example.com", amount: 10, purpose: "test" }] }, { text: "Sorry" });
