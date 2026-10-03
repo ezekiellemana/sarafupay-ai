@@ -19,7 +19,7 @@ export const env = {
   geminiModel: () => get("GEMINI_MODEL", "gemini-3.8-flash"),
   /** Tried in order when the primary model is overloaded (503), rate-limited (429) or retired (404). */
   geminiModels: () =>
-    [get("GEMINI_MODEL", "gemini-3.8-flash"), ...get("GEMINI_FALLBACK_MODELS", "gemini-3.6-flash,gemini-3.5-flash,gemini-3.5-flash-lite").split(",")]
+    [get("GEMINI_MODEL", "gemini-3.8-flash"), ...get("GEMINI_FALLBACK_MODELS", "gemini-3.6-flash,gemini-3.5-flash-lite,gemini-3.5-flash").split(",")]
       .map((m) => m.trim())
       .filter((m, i, a) => m && a.indexOf(m) === i),
 
