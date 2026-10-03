@@ -69,6 +69,9 @@ export default async function DashboardPage({ params, searchParams }: PageProps<
           </a>
         </div>
       </header>
+      <p className="border-b border-line bg-paper-2 px-5 py-2 text-xs text-ink-soft md:hidden">
+        Tip: the treasurer dashboard is built for bigger screens. Rotate your phone or open it on a laptop for the full view.
+      </p>
       <main className="min-h-0 flex-1">
         <StudioDashboard
           code={col.code}
