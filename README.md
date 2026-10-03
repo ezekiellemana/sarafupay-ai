@@ -23,10 +23,8 @@ Built for the [PayPal AI Hackathon 2026](https://paypalaihackathon.devpost.com).
 | Option | How |
 |---|---|
 | **Real WhatsApp** | Message **+255 650 972 587** (display name *SarafuPay*), e.g. `Hi, I want to collect $300 for a wedding` |
-| **Web simulator** (no phone needed) | Open [`/chat`](https://sarafupay-ai.onrender.com/chat). Same agent, same PayPal sandbox, switch between Organiser and Friends |
-| **Pay as a friend** | Use the pay link the bot sends and log in with a PayPal sandbox **personal** account (credentials are shown inside the simulator) |
-
-> The free Render instance sleeps when idle. The first message after a pause can take ~50 seconds; later ones are fast.
+| **Web simulator** (no phone needed) | Open [`/chat`](https://sarafupay-ai.onrender.com/chat). Same agent, same PayPal sandbox. Every browser gets its **own private session** with its own test numbers, so you start clean and never see another judge's chats. Switch between Organiser and friends, or add your own test people |
+| **Pay as a friend** | Use the pay link the bot sends, or the public page `/c/CODE`, and log in with a PayPal sandbox **personal** account (credentials are shown inside the simulator) |
 
 ## The problem
 
@@ -41,8 +39,9 @@ Across East Africa and the diaspora, money for weddings, funerals, hospital bill
 | **Pledgers** | "I'll pay $25 on Friday" | Pledge recorded; organiser can send **reminders** or a **PayPal invoice + QR** (Agent Toolkit) |
 | **Organiser** | "Who hasn't paid?" / "Tuna kiasi gani?" | AI answers from live data |
 | **Organiser** | "Pay Mama Lishe $300 for catering" | AI prepares a **PayPal Payout**; money moves **only** after the organiser replies `CONFIRM <6-digit code>`, a step the LLM never touches |
-| **Everyone** | – | Every payout is broadcast to contributors as a **transparency update** and listed on the public page `/c/CODE` |
-| **Treasurer** | Private dashboard `/d/CODE` | **AG Studio** dashboard with a custom **Treasurer agent** that delegates to Studio's built-in agents |
+| **Everyone** | – | Every payout is broadcast to contributors as a **transparency update** and listed on the public page `/c/CODE`, next to a searchable, paginated supporters list (first names and messages only) |
+| **Anyone with the link** | Public page `/c/CODE` | Chip in on the web: one currency-aware amount field with live formatting and quick picks, then PayPal checkout |
+| **Treasurer** | Private dashboard `/d/CODE` | **AG Studio** dashboard (KPIs, charts, contribution/pledge/payout ledgers) with a custom **Treasurer agent** that delegates to Studio's built-in agents |
 
 ### Speaks the user's language
 
@@ -74,7 +73,9 @@ Treasurer dashboard (/d/CODE) ─► AG Studio + Studio Agent Framework ─► /
 ### Safety by design
 
 - **The LLM cannot move money.** It can only *prepare* a payout. Execution needs a one-time code from the organiser's own number (15-minute expiry, single use, balance re-checked, PayPal idempotency key).
-- **Role-based privacy.** Only the organiser sees contributor names; everyone else sees totals and the payout ledger.
+- **Role-based privacy.** Only the organiser sees full names and amounts. The public page shows totals, the payout ledger and supporters' first names; email search there only matches a full, exact address, so emails can't be harvested.
+- **Private simulator sessions.** An HttpOnly cookie per browser; test phone numbers are derived on the server, so visitors can't read or write each other's chats. Simulator history is deleted after 14 days.
+- **Cost guard.** Per-sender and daily AI limits keep a public demo from draining the model budget.
 - **Verified webhooks.** PayPal and Meta signatures are checked; duplicate WhatsApp deliveries are ignored so nobody gets double replies.
 - **Sandbox pinned.** The Agent Toolkit is forced to `sandbox: true`.
 - **Resilient AI.** If a Gemini model is overloaded or rate-limited, the agent falls back through `gemini-3.8-flash` → `3.6-flash` → `3.5-flash` → `3.5-flash-lite`.
@@ -120,6 +121,9 @@ Without WhatsApp keys everything still works through the `/chat` simulator.
 3. Switch to **Friend · Amina** → `Contribute <CODE>` → `$20` → open the link → pay with the sandbox buyer shown in the simulator.
 4. Back as Organiser: see the alert, ask `who has paid?`, then `pay caterer@example.com $10 for the deposit` and reply with the `CONFIRM` code.
 5. Watch the transparency update arrive for Amina, then ask for the **dashboard link** to open the AG Studio treasurer dashboard.
+6. Open the public page `/c/<CODE>`: the payout ledger, the supporters list (search by name) and the web checkout.
+
+Your simulator session is private to your browser. Use **Start fresh** in the simulator's help panel to reset it.
 
 Try it in Swahili too: `Habari, nataka kuanzisha mchango wa msiba, lengo $200`.
 
@@ -127,7 +131,7 @@ Try it in Swahili too: `Habari, nataka kuanzisha mchango wa msiba, lengo $200`.
 
 `npm test` runs the whole money flow end to end with a scripted LLM, in-memory Postgres and a stubbed PayPal API:
 
-collection created · payment link · capture settled once (idempotent) with receipt + organiser alert · Swahili receipt for a Tanzanian contributor · pledge + reminder · non-owner payout blocked · over-balance payout blocked · payout executed once by CONFIRM code (wrong code and replay rejected) · transparency broadcast · privacy for non-owners.
+collection created · language follows the share card, then the user's own words · private simulator sessions · payment link · capture settled once (idempotent) with receipt + organiser alert · Swahili receipt for a Tanzanian contributor · supporters search (no email leaks) · pledge + reminder · refused WhatsApp reminder not marked as sent · non-owner payout blocked · over-balance payout blocked · payout executed once by CONFIRM code (wrong code and replay rejected) · transparency broadcast · privacy for non-owners.
 
 ## Built with
 
