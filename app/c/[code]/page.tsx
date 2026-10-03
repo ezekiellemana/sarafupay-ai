@@ -31,16 +31,16 @@ export default async function CollectionPage({ params, searchParams }: PageProps
   return (
     <div className="min-h-screen">
       <div className="kanga" />
-      <header className="mx-auto flex max-w-5xl items-center justify-between px-6 py-5">
+      <header className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-5 py-4 sm:px-6 sm:py-5">
         <Logo />
         <SandboxBadge />
       </header>
-      <main className="mx-auto grid max-w-5xl gap-8 px-6 pb-20 lg:grid-cols-[1.2fr_0.8fr]">
+      <main className="mx-auto grid max-w-5xl gap-8 px-5 pb-20 sm:px-6 lg:grid-cols-[1.2fr_0.8fr]">
         <section className="rise">
           <p className="font-mono text-xs uppercase tracking-[0.2em] text-ink-soft">
             {categoryEmoji[col.category] ?? "✨"} {col.category} · code {col.code}
           </p>
-          <h1 className="font-display mt-3 text-4xl font-semibold leading-tight sm:text-6xl">{col.title}</h1>
+          <h1 className="font-display mt-3 break-words text-[2.25rem] font-semibold leading-tight sm:text-6xl">{col.title}</h1>
           {col.purpose ? <p className="mt-4 max-w-xl text-lg text-ink-soft leading-relaxed">{col.purpose}</p> : null}
           <p className="mt-3 text-sm text-ink-soft">
             Organised by <strong className="text-ink">{owner?.name ?? "the organiser"}</strong>
@@ -48,7 +48,7 @@ export default async function CollectionPage({ params, searchParams }: PageProps
             {col.status !== "active" ? <> · <span className="text-terracotta font-semibold">closed</span></> : null}
           </p>
 
-          <div className="card mt-8 p-6">
+          <div className="card mt-8 p-5 sm:p-6">
             <div className="flex items-end justify-between gap-4">
               <div>
                 <p className="font-display text-4xl font-semibold">{money(stats.raisedCents, col.currency)}</p>
@@ -63,6 +63,11 @@ export default async function CollectionPage({ params, searchParams }: PageProps
               <div><p className="font-semibold">{money(stats.availableCents, col.currency)}</p><p className="text-ink-soft">balance</p></div>
             </div>
           </div>
+          {col.status === "active" ? (
+            <a href="#chip-in" className="btn btn-primary mt-4 w-full justify-center lg:hidden">
+              Chip in with PayPal ↓
+            </a>
+          ) : null}
 
           <h2 className="font-display mt-10 text-2xl font-semibold">Where the money went</h2>
           {ledger.length === 0 ? (
@@ -96,13 +101,13 @@ export default async function CollectionPage({ params, searchParams }: PageProps
           ) : null}
         </section>
 
-        <aside className="rise d2 lg:sticky lg:top-6 h-fit">
+        <aside id="chip-in" className="rise d2 h-fit scroll-mt-4 lg:sticky lg:top-6">
           <form action={contributeAction.bind(null, col.code)} className="card overflow-hidden">
             <div className="bg-forest px-6 py-4 text-paper">
               <p className="font-display text-2xl font-semibold">Chip in</p>
               <p className="text-sm opacity-80">Secure checkout with PayPal</p>
             </div>
-            <div className="space-y-4 p-6">
+            <div className="space-y-4 p-5 sm:p-6">
               {sp.cancelled ? <p className="rounded-lg bg-paper-2 p-3 text-sm">Payment cancelled. No money moved.</p> : null}
               {err ? <p className="rounded-lg bg-terracotta/10 p-3 text-sm text-terracotta">{err === "amount" ? "Please enter a valid amount." : err}</p> : null}
               <fieldset>
@@ -120,15 +125,15 @@ export default async function CollectionPage({ params, searchParams }: PageProps
               </fieldset>
               <label className="block text-sm font-medium">
                 Or another amount
-                <input name="amount_custom" inputMode="decimal" placeholder="e.g. 35" className="mt-1 w-full rounded-xl border border-line bg-white px-3 py-2 font-mono" />
+                <input name="amount_custom" inputMode="decimal" placeholder="e.g. 35" className="mt-1 w-full rounded-xl border border-line bg-white px-3 py-2 font-mono text-base" />
               </label>
               <label className="block text-sm font-medium">
                 Your name
-                <input name="name" required maxLength={80} placeholder="Shown to the organiser" className="mt-1 w-full rounded-xl border border-line bg-white px-3 py-2" />
+                <input name="name" required maxLength={80} placeholder="Shown to the organiser" className="mt-1 w-full rounded-xl border border-line bg-white px-3 py-2 text-base" />
               </label>
               <label className="block text-sm font-medium">
                 Message <span className="text-ink-soft font-normal">(optional)</span>
-                <input name="message" maxLength={280} placeholder="Hongera! 🎉" className="mt-1 w-full rounded-xl border border-line bg-white px-3 py-2" />
+                <input name="message" maxLength={280} placeholder="Hongera! 🎉" className="mt-1 w-full rounded-xl border border-line bg-white px-3 py-2 text-base" />
               </label>
               <button disabled={col.status !== "active"} className="btn btn-primary w-full justify-center disabled:opacity-50">
                 Continue to PayPal →
