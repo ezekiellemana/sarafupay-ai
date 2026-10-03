@@ -29,6 +29,8 @@ export const env = {
   waAppSecret: () => get("WHATSAPP_APP_SECRET"),
   waDisplayNumber: () => get("WHATSAPP_DISPLAY_NUMBER").replace(/[^0-9]/g, ""),
   waGraphVersion: () => get("WHATSAPP_GRAPH_VERSION", "v23.0"),
+  /** Approved UTILITY template used for pledge reminders outside the 24h window ("off" disables). */
+  waReminderTemplate: () => get("WHATSAPP_REMINDER_TEMPLATE", "pledge_reminder"),
 
   simulatorEnabled: () => get("ENABLE_SIMULATOR", "true") !== "false",
   agStudioLicense: () => get("NEXT_PUBLIC_AG_STUDIO_LICENSE_KEY"),
