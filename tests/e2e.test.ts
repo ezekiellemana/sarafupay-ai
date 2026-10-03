@@ -9,6 +9,8 @@ process.env.PGLITE_DIR = "memory";
 process.env.PAYPAL_CLIENT_ID = "test-id";
 process.env.PAYPAL_SECRET = "test-secret";
 process.env.APP_URL = "https://sarafupay.test";
+process.env.WHATSAPP_ACCESS_TOKEN = "test-wa";
+process.env.WHATSAPP_PHONE_NUMBER_ID = "123";
 
 type Step = { tool?: [string, Record<string, unknown>]; text?: string };
 const script: Step[] = [];
@@ -45,6 +47,10 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     if (url.includes("/v1/payments/payouts/BATCH1"))
       return Response.json({ batch_header: { payout_batch_id: "BATCH1", batch_status: "SUCCESS" }, items: [{ payout_item_id: "ITEM1", transaction_status: "SUCCESS" }] });
     throw new Error(`unexpected PayPal call ${url}`);
+  }
+  if (url.includes("graph.facebook.com")) {
+    // Simulate Meta refusing free-form text outside the 24h customer-service window.
+    return Response.json({ error: { code: 131047, message: "Re-engagement message" } }, { status: 400 });
   }
   return realFetch(input, init);
 }) as typeof fetch;
@@ -105,6 +111,17 @@ async function main() {
   await say(OWNER, "remind people who haven't paid");
   assert.ok((await inbox(JOHN)).some((m) => m.includes("friendly reminder") && m.includes("/pay/ctb_")), "John reminded with link");
   console.log("✓ pledge + reminder with pay link");
+
+  // 4b. Reminder WhatsApp refuses (24h window) -> not marked reminded, link returned to organiser
+  const GRACE = "255700000404"; // real WhatsApp number (not sim)
+  const grace = await core.getOrCreateUser(GRACE, "whatsapp", "Grace");
+  await core.createPledge({ collection: col, user: grace, displayName: "Grace", amountCents: 1500, dueDate: "2026-12-01" });
+  const r = await core.remindPledgers(col);
+  assert.ok(r.unreachable.some((u) => u.name === "Grace" && u.pay_link.includes("/pay/ctb_")), "Grace reported unreachable with link");
+  assert.ok(!r.reminded.includes("Grace"), "Grace not counted as reminded");
+  const [gp] = await db.select().from(schema.pledges).where(eq(schema.pledges.userId, grace.id));
+  assert.equal(gp.remindedAt, null, "remindedAt stays empty when WhatsApp refused");
+  console.log("✓ refused WhatsApp reminder is not marked as sent; organiser gets the pay link");
 
   // 5. Non-owner cannot pay out
   script.push({ tool: ["prepare_payout", { code: col.code, recipient_email: "x@example.com", amount: 10, purpose: "test" }] }, { text: "Sorry" });
