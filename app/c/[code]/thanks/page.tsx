@@ -17,9 +17,9 @@ export default async function Thanks({ params, searchParams }: PageProps<"/c/[co
   return (
     <div className="min-h-screen">
       <div className="kanga" />
-      <main className="mx-auto max-w-lg px-6 py-12 text-center">
+      <main className="mx-auto max-w-lg px-5 py-10 text-center sm:px-6 sm:py-12">
         <Logo />
-        <div className="card rise mt-10 p-8">
+        <div className="card rise mt-8 p-6 sm:mt-10 sm:p-8">
           <p className="text-5xl">{paid ? "🎉" : "⏳"}</p>
           <h1 className="font-display mt-4 text-3xl font-semibold">{paid ? "Asante sana!" : "Almost there"}</h1>
           <p className="mt-2 text-ink-soft">
