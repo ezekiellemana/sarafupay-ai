@@ -11,8 +11,8 @@ const SW_STRONG = /\b(habari|asante|nataka|naitwa|mchango|michango|tafadhali|nip
 export function detectLang(text: string): Lang | null {
   const t = text.trim();
   if (!t) return null;
-  // Commands like "CONFIRM 123456" or "Contribute NEEMA24" carry no language signal.
-  if (/^(confirm|cancel|contribute)\b/i.test(t) && t.split(/\s+/).length <= 3) return null;
+  // Short commands ("CONFIRM 123456", "Contribute NEEMA24") are not real language signals; see commandLang.
+  if (/^(confirm|cancel|contribute|thibitisha|ghairi|changia)\b/i.test(t) && t.split(/\s+/).length <= 3) return null;
   if (SW_STRONG.test(t)) return "sw";
   const hits = t.match(SW)?.length ?? 0;
   const words = t.split(/\s+/).length;
@@ -20,7 +20,22 @@ export function detectLang(text: string): Lang | null {
   return /[a-z]{3,}/i.test(t) ? "en" : null;
 }
 
-/** Language a person last wrote in; Tanzanian numbers default to Swahili. */
+/**
+ * Weak hint from a share-card command: the wa.me link pre-fills "Contribute CODE" on English
+ * cards and "Changia CODE" on Swahili ones, so a newcomer who only tapped the link gets the
+ * organiser's language instead of the +255 default.
+ */
+function commandLang(text: string): Lang | null {
+  const t = text.trim();
+  if (/^contribute\b/i.test(t)) return "en";
+  if (/^changia\b/i.test(t)) return "sw";
+  return null;
+}
+
+/**
+ * Language a person writes in: the latest real message wins; failing that a share-card
+ * command; failing that, Tanzanian numbers default to Swahili and others to English.
+ */
 export async function langOf(phone: string): Promise<Lang> {
   const db = await getDb();
   const rows = await db
@@ -28,9 +43,13 @@ export async function langOf(phone: string): Promise<Lang> {
     .from(schema.chatLog)
     .where(and(eq(schema.chatLog.phone, phone), eq(schema.chatLog.direction, "in")))
     .orderBy(desc(schema.chatLog.id))
-    .limit(3);
+    .limit(5);
   for (const r of rows) {
     const l = detectLang(r.text);
+    if (l) return l;
+  }
+  for (const r of rows) {
+    const l = commandLang(r.text);
     if (l) return l;
   }
   return phone.replace(/^sim:/, "").startsWith("255") ? "sw" : "en";
