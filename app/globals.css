@@ -135,6 +135,50 @@ body {
 }
 .sheet.open { transform: none; visibility: visible; }
 
+/* People dropdown (header). Scale + fade from the top-right corner. */
+.menu-pop {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 45;
+  width: min(17rem, calc(100vw - 1.5rem));
+  background: #fffaf0; border: 1.5px solid var(--line); border-radius: 18px;
+  padding: 0.4rem; color: var(--ink);
+  box-shadow: 0 12px 28px -14px rgba(18, 38, 30, 0.45);
+  transform-origin: top right;
+  transform: scale(0.94) translate3d(0, -4px, 0);
+  opacity: 0; visibility: hidden;
+  transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.15s ease, visibility 0s linear 0.18s;
+}
+.menu-pop.open {
+  transform: none; opacity: 1; visibility: visible;
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.15s ease, visibility 0s;
+}
+/* Add-person dialog: the one place we use a (small) backdrop blur. */
+.dialog-backdrop {
+  position: fixed; inset: 0; z-index: 60;
+  background: rgba(18, 38, 30, 0.35);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  opacity: 0; visibility: hidden;
+  transition: opacity 0.2s ease, visibility 0s linear 0.2s;
+}
+.dialog-backdrop.open { opacity: 1; visibility: visible; transition: opacity 0.2s ease, visibility 0s; }
+.dialog {
+  position: fixed; left: 50%; top: max(12dvh, 4.5rem); z-index: 61;
+  width: calc(100vw - 2rem); max-width: 26rem;
+  background: #fffaf0; border: 1.5px solid var(--line); border-radius: 22px;
+  padding: 1.25rem; color: var(--ink);
+  box-shadow: 0 24px 48px -24px rgba(18, 38, 30, 0.55);
+  transform: translate3d(-50%, 10px, 0) scale(0.96);
+  opacity: 0; visibility: hidden;
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.18s ease, visibility 0s linear 0.22s;
+}
+.dialog.open {
+  transform: translate3d(-50%, 0, 0); opacity: 1; visibility: visible;
+  transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.18s ease, visibility 0s;
+}
+@media (min-width: 640px) { .dialog { top: 22dvh; } }
+@media (prefers-reduced-transparency: reduce) {
+  .dialog-backdrop { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(18, 38, 30, 0.6); }
+}
+
 /* Long sections below the fold: let the browser skip rendering them until needed. */
 .defer-render { content-visibility: auto; contain-intrinsic-size: auto 700px; }
 
