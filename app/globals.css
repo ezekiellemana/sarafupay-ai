@@ -179,6 +179,15 @@ body {
   .dialog-backdrop { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(18, 38, 30, 0.6); }
 }
 
+/* Supporters list: rows fade up a little when a page/search result arrives. */
+.supporter-row { animation: rise 0.35s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.spinner {
+  width: 16px; height: 16px; border-radius: 999px;
+  border: 2px solid var(--line); border-top-color: var(--forest);
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
 /* Long sections below the fold: let the browser skip rendering them until needed. */
 .defer-render { content-visibility: auto; contain-intrinsic-size: auto 700px; }
 
