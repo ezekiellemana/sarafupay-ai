@@ -37,7 +37,7 @@ export default async function Home() {
   return (
     <div className="flex min-h-screen flex-col">
       <div className="kanga" />
-      <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-5">
+      <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-5 py-4 sm:px-6 sm:py-5">
         <Logo />
         <nav className="flex items-center gap-5 text-sm font-medium text-ink-soft">
           <a href="#how" className="hidden sm:inline hover:text-ink">How it works</a>
@@ -46,33 +46,33 @@ export default async function Home() {
         </nav>
       </header>
 
-      <main className="mx-auto grid w-full max-w-6xl flex-1 items-center gap-12 px-6 pb-16 pt-6 lg:grid-cols-[1.15fr_0.85fr]">
+      <main className="mx-auto grid w-full max-w-6xl flex-1 items-center gap-12 px-5 pb-16 pt-4 sm:px-6 sm:pt-6 lg:grid-cols-[1.15fr_0.85fr]">
         <section>
           <div className="rise"><SandboxBadge /></div>
-          <h1 className="rise d1 font-display mt-6 text-5xl leading-[1.02] font-semibold tracking-tight sm:text-7xl">
+          <h1 className="rise d1 font-display mt-6 text-[2.75rem] leading-[1.02] font-semibold tracking-tight sm:text-7xl">
             Michango,<br />
             <span className="italic text-forest-2">without</span> the<br />
             notebook.
           </h1>
-          <p className="rise d2 mt-6 max-w-xl text-lg leading-relaxed text-ink-soft">
+          <p className="rise d2 mt-6 max-w-xl text-base leading-relaxed text-ink-soft sm:text-lg">
             SarafuPay is an AI agent that lives in WhatsApp. It runs group collections for weddings, funerals, medical bills,
             school fees and NGOs. It collects with <strong className="text-ink">PayPal</strong> and pays out in the open, so
             everyone who gave can see where the money went.
           </p>
-          <div className="rise d3 mt-8 flex flex-wrap gap-3">
-            <Link href="/chat" className="btn btn-primary">Open the chat simulator →</Link>
+          <div className="rise d3 mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+            <Link href="/chat" className="btn btn-primary justify-center">Open the chat simulator →</Link>
             {wa ? (
-              <a href={wa} className="btn btn-ghost" target="_blank" rel="noreferrer">Message us on WhatsApp</a>
+              <a href={wa} className="btn btn-ghost justify-center" target="_blank" rel="noreferrer">Message us on WhatsApp</a>
             ) : null}
           </div>
-          <dl className="rise d4 mt-10 grid max-w-lg grid-cols-3 gap-6 border-t border-line pt-6">
+          <dl className="rise d4 mt-10 grid max-w-lg grid-cols-3 gap-4 border-t border-line pt-6 sm:gap-6">
             {[
               ["0", "apps to install"],
               ["1", "message to share"],
               ["100%", "payouts reported"],
             ].map(([k, v]) => (
               <div key={v}>
-                <dt className="font-display text-3xl font-semibold">{k}</dt>
+                <dt className="font-display text-2xl font-semibold sm:text-3xl">{k}</dt>
                 <dd className="text-sm text-ink-soft">{v}</dd>
               </div>
             ))}
@@ -81,9 +81,10 @@ export default async function Home() {
 
         <section aria-label="Example conversation" className="rise d3 relative mx-auto w-full max-w-sm">
           <div className="absolute -inset-4 -rotate-3 rounded-[2.5rem] bg-marigold/30" aria-hidden />
-          <div className="relative overflow-hidden rounded-[2.2rem] border-[10px] border-ink bg-[var(--chat-bg)] shadow-2xl">
+          <div className="frame-shadow relative overflow-hidden rounded-[2.2rem] border-[10px] border-ink bg-[var(--chat-bg)]">
             <div className="flex items-center gap-3 bg-forest px-4 py-3 text-paper">
-              <div className="grid h-9 w-9 place-items-center rounded-full bg-marigold font-display font-bold text-ink">S</div>
+              {/* eslint-disable-next-line @next/next/no-img-element -- static brand mark */}
+              <img src="/brand/sarafupay-icon.png" alt="" width={36} height={36} className="h-9 w-9 rounded-full bg-paper" />
               <div>
                 <p className="text-sm font-semibold">SarafuPay</p>
                 <p className="text-[11px] opacity-75">AI agent · online</p>
@@ -93,7 +94,7 @@ export default async function Home() {
               {demo.map((m, i) => (
                 <div key={i} className={`flex ${m.from === "me" ? "justify-end" : "justify-start"}`}>
                   <p
-                    className="bubble max-w-[82%] whitespace-pre-line rounded-2xl px-3 py-2 shadow-sm"
+                    className="bubble bubble-demo max-w-[82%] whitespace-pre-line rounded-2xl px-3 py-2"
                     style={{
                       background: m.from === "me" ? "var(--bubble-out)" : "var(--bubble-in)",
                       animationDelay: `${0.5 + i * 0.35}s`,
@@ -110,8 +111,8 @@ export default async function Home() {
         </section>
       </main>
 
-      <section id="how" className="bg-forest text-paper">
-        <div className="mx-auto max-w-6xl px-6 py-20">
+      <section id="how" className="defer-render bg-forest text-paper">
+        <div className="mx-auto max-w-6xl px-5 py-16 sm:px-6 sm:py-20">
           <h2 className="font-display text-4xl font-semibold sm:text-5xl">How it works</h2>
           <div className="mt-12 grid gap-10 md:grid-cols-3">
             {steps.map((s) => (
@@ -125,7 +126,7 @@ export default async function Home() {
         </div>
       </section>
 
-      <section id="trust" className="mx-auto grid max-w-6xl gap-10 px-6 py-20 md:grid-cols-2">
+      <section id="trust" className="defer-render mx-auto grid max-w-6xl gap-10 px-5 py-16 sm:px-6 sm:py-20 md:grid-cols-2">
         <div>
           <h2 className="font-display text-4xl font-semibold">Built for trust</h2>
           <p className="mt-4 text-ink-soft leading-relaxed">
@@ -149,7 +150,7 @@ export default async function Home() {
       </section>
 
       <footer className="border-t border-line">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-8 text-sm text-ink-soft">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-5 py-8 text-sm text-ink-soft sm:px-6">
           <Logo />
           <p>
             PayPal Orders · Payouts · Invoicing via Agent Toolkit · Gemini · AG Studio · Render. Built for the PayPal AI
