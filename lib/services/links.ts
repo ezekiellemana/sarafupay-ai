@@ -12,7 +12,7 @@ export const simulatorUrl = (text?: string) =>
 
 /** Ready-to-forward message for WhatsApp groups, in the organiser's language. */
 export function shareMessage(c: Collection, ownerName?: string | null, lang: Lang = "en"): string {
-  const join = `Contribute ${c.code}`;
+  const join = lang === "sw" ? `Changia ${c.code}` : `Contribute ${c.code}`;
   const wa = waLink(join);
   const target = money(c.targetCents, c.currency);
   return [
