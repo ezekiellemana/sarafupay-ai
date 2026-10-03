@@ -12,7 +12,22 @@ export function paypalSdk(): Client {
       oAuthClientId: env.paypalClientId(),
       oAuthClientSecret: env.paypalSecret(),
     },
-    timeout: 0,
+    // The SDK's generated default timeout is 0 (= wait forever) and retries are off
+    // (maximumRetryWaitTime 0). Bound each attempt and allow safe retries for GETs only;
+    // POSTs are not retried by the SDK — create/capture carry PayPal-Request-Id instead.
+    timeout: 20_000,
+    httpClientOptions: {
+      timeout: 20_000,
+      retryConfig: {
+        maxNumberOfRetries: 2,
+        retryInterval: 1,
+        backoffFactor: 2,
+        maximumRetryWaitTime: 10,
+        retryOnTimeout: true,
+        httpStatusCodesToRetry: [408, 429, 500, 502, 503, 504],
+        httpMethodsToRetry: ["GET"],
+      },
+    },
     environment: Environment.Sandbox,
     logging: { logLevel: LogLevel.Warn },
   });
