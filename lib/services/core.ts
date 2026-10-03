@@ -357,8 +357,18 @@ export async function createPledge(input: {
   return p!;
 }
 
-/** Sends a personal WhatsApp reminder with a fresh pay link to each open pledger. */
-export async function remindPledgers(col: Collection): Promise<{ reminded: string[]; skipped: string[] }> {
+/**
+ * Sends a personal WhatsApp reminder with a fresh pay link to each open pledger.
+ * A pledge is marked reminded only when WhatsApp accepted the message; pledgers we
+ * could not reach (usually: no message from them in 24h, so Meta refuses free text)
+ * come back in `unreachable` with their pay link, for the organiser to forward.
+ * Sends are spaced ~1s apart to stay inside per-number throughput limits.
+ */
+export async function remindPledgers(col: Collection): Promise<{
+  reminded: string[];
+  skipped: string[];
+  unreachable: { name: string; reason: string; pay_link: string }[];
+}> {
   const db = await getDb();
   const open = await db
     .select()
@@ -366,6 +376,8 @@ export async function remindPledgers(col: Collection): Promise<{ reminded: strin
     .where(and(eq(pledges.collectionId, col.id), eq(pledges.status, "open")));
   const reminded: string[] = [];
   const skipped: string[] = [];
+  const unreachable: { name: string; reason: string; pay_link: string }[] = [];
+  let sentToWhatsApp = 0;
   for (const p of open) {
     const u = p.userId ? await getUser(p.userId) : undefined;
     if (!u) {
@@ -381,7 +393,8 @@ export async function remindPledgers(col: Collection): Promise<{ reminded: strin
     });
     const L = await langOf(u.phone);
     const amt = money(p.amountCents, col.currency);
-    await sendTo(
+    if (u.channel !== "sim" && sentToWhatsApp++ > 0) await new Promise((r) => setTimeout(r, 1100));
+    const sent = await sendTo(
       u.phone,
       t(
         L,
@@ -389,10 +402,18 @@ export async function remindPledgers(col: Collection): Promise<{ reminded: strin
         `👋 Hi ${p.displayName}, a friendly reminder about your pledge of ${amt} to *${col.title}*${p.dueDate ? ` (due ${p.dueDate})` : ""}.\nPay securely with PayPal: ${payUrl(ctb.id)}`,
       ),
     );
-    await db.update(pledges).set({ remindedAt: new Date() }).where(eq(pledges.id, p.id));
-    reminded.push(p.displayName);
+    if (sent.ok) {
+      await db.update(pledges).set({ remindedAt: new Date() }).where(eq(pledges.id, p.id));
+      reminded.push(p.displayName);
+    } else {
+      unreachable.push({
+        name: p.displayName,
+        reason: sent.reason === "outside_24h" ? "has not messaged SarafuPay in the last 24 hours (WhatsApp rule)" : "WhatsApp did not accept the message",
+        pay_link: payUrl(ctb.id),
+      });
+    }
   }
-  return { reminded, skipped };
+  return { reminded, skipped, unreachable };
 }
 
 // ---------- payouts ----------
