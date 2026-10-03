@@ -4,10 +4,18 @@ import { env, whatsappConfigured } from "../env";
 
 const graph = () => `https://graph.facebook.com/${env.waGraphVersion()}`;
 
-export async function sendWhatsAppText(toDigits: string, body: string): Promise<void> {
+export type SendResult = { ok: true } | { ok: false; reason: "outside_24h" | "not_configured" | "error"; detail?: string };
+
+/**
+ * Sends a text and reports whether Meta accepted it. Callers that record state
+ * (e.g. "reminded") must check `ok` — a failed send is not a sent message.
+ * Error 131047 = more than 24h since the user last messaged us; free-form text is
+ * refused until they write again (only approved templates can be sent).
+ */
+export async function sendWhatsAppText(toDigits: string, body: string): Promise<SendResult> {
   if (!whatsappConfigured()) {
     console.warn("[whatsapp] not configured; message not sent to", toDigits);
-    return;
+    return { ok: false, reason: "not_configured" };
   }
   // WhatsApp caps text bodies at 4096 chars.
   for (let i = 0; i < body.length; i += 4000) {
@@ -22,8 +30,13 @@ export async function sendWhatsAppText(toDigits: string, body: string): Promise<
         text: { preview_url: true, body: body.slice(i, i + 4000) },
       }),
     });
-    if (!res.ok) console.error("[whatsapp] send failed", res.status, await res.text());
+    if (!res.ok) {
+      const detail = await res.text();
+      console.error("[whatsapp] send failed", res.status, detail);
+      return { ok: false, reason: /131047|re-engagement/i.test(detail) ? "outside_24h" : "error", detail: detail.slice(0, 300) };
+    }
   }
+  return { ok: true };
 }
 
 export async function markRead(messageId: string): Promise<void> {

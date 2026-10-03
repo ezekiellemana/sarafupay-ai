@@ -1,6 +1,6 @@
 import "server-only";
 import { getDb, schema } from "../db";
-import { sendWhatsAppText } from "./whatsapp";
+import { sendWhatsAppText, type SendResult } from "./whatsapp";
 import { toWhatsAppFormat } from "../i18n";
 
 export function isSimPhone(phone: string) {
@@ -12,10 +12,11 @@ export async function logInbound(phone: string, text: string) {
   await db.insert(schema.chatLog).values({ phone, direction: "in", text });
 }
 
-/** Sends a message to a user on their channel and records it in the chat log. */
-export async function sendTo(phone: string, raw: string): Promise<void> {
+/** Sends a message to a user on their channel and records it in the chat log. Returns whether it was accepted. */
+export async function sendTo(phone: string, raw: string): Promise<SendResult> {
   const text = toWhatsAppFormat(raw);
   const db = await getDb();
   await db.insert(schema.chatLog).values({ phone, direction: "out", text });
-  if (!isSimPhone(phone)) await sendWhatsAppText(phone, text);
+  if (isSimPhone(phone)) return { ok: true };
+  return sendWhatsAppText(phone, text);
 }
