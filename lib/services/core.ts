@@ -4,6 +4,8 @@ import { getDb, schema } from "../db";
 import type { Collection, Contribution, Payout, User } from "../db/schema";
 import { money, newId, pct, progressBar, randomDigits, slugCode } from "../format";
 import { sendTo } from "../channels/messaging";
+import { sendWhatsAppTemplate } from "../channels/whatsapp";
+import { env } from "../env";
 import { captureOrder, createContributionOrder } from "../paypal/orders";
 import { getPayoutBatch, sendPayout } from "../paypal/payouts";
 import { dashboardUrl, payUrl } from "./links";
@@ -459,13 +461,25 @@ export async function remindPledgers(col: Collection): Promise<{
         `👋 Hi ${p.displayName}, a friendly reminder about your pledge of ${amt} to *${col.title}*${p.dueDate ? ` (due ${p.dueDate})` : ""}.\nPay securely with PayPal: ${payUrl(ctb.id)}`,
       ),
     );
-    if (sent.ok) {
+    let delivered = sent;
+    // Outside WhatsApp's 24h window free text is refused; an approved template still gets through.
+    const tpl = env.waReminderTemplate();
+    if (!sent.ok && sent.reason === "outside_24h" && tpl && tpl !== "off") {
+      delivered = await sendWhatsAppTemplate(
+        u.phone,
+        tpl,
+        L === "sw" ? "sw" : "en",
+        [p.displayName, amt, col.title, p.dueDate ?? t(L, "haijawekwa", "not set")],
+        ctb.id,
+      );
+    }
+    if (delivered.ok) {
       await db.update(pledges).set({ remindedAt: new Date() }).where(eq(pledges.id, p.id));
       reminded.push(p.displayName);
     } else {
       unreachable.push({
         name: p.displayName,
-        reason: sent.reason === "outside_24h" ? "has not messaged SarafuPay in the last 24 hours (WhatsApp rule)" : "WhatsApp did not accept the message",
+        reason: !sent.ok && sent.reason === "outside_24h" ? "has not messaged SarafuPay in the last 24 hours (WhatsApp rule)" : "WhatsApp did not accept the message",
         pay_link: payUrl(ctb.id),
       });
     }
