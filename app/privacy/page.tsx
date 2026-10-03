@@ -49,8 +49,9 @@ export default function PrivacyPage() {
         <Section title="How we use it">
           Only to run the service: creating collections, sending pay links, receipts, reminders and transparency updates,
           preparing payouts that the organiser confirms with a one-time code, and showing the organiser&apos;s private
-          dashboard. Contributor names are visible only to that collection&apos;s organiser; everyone else sees totals and
-          the payout ledger.
+          dashboard. The public collection page shows totals, the payout ledger and each supporter&apos;s first name and
+          optional message, never amounts or emails (an email search there only matches a full, exact address). Full
+          names and amounts are visible only to that collection&apos;s organiser.
         </Section>
 
         <Section title="Who processes it">
