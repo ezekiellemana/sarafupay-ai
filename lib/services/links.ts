@@ -10,13 +10,18 @@ export const dashboardUrl = (c: Collection) => `${env.appUrl()}/d/${c.code}?key=
 export const simulatorUrl = (text?: string) =>
   `${env.appUrl()}/chat${text ? `?text=${encodeURIComponent(text)}` : ""}`;
 
+export const CATEGORY_EMOJI: Record<string, string> = {
+  wedding: "💍", funeral: "🕊️", medical: "🩺", education: "🎓", community: "🏘️", nonprofit: "🤝", celebration: "🎉", other: "✨",
+};
+export const categoryEmoji = (category?: string | null) => CATEGORY_EMOJI[category ?? ""] ?? "🤝";
+
 /** Ready-to-forward message for WhatsApp groups, in the organiser's language. */
 export function shareMessage(c: Collection, ownerName?: string | null, lang: Lang = "en"): string {
   const join = lang === "sw" ? `Changia ${c.code}` : `Contribute ${c.code}`;
   const wa = waLink(join);
   const target = money(c.targetCents, c.currency);
   return [
-    `🤝 *${c.title}*`,
+    `${categoryEmoji(c.category)} *${c.title}*`,
     c.purpose ? c.purpose : null,
     t(lang, `Lengo: *${target}*${c.deadline ? ` kufikia ${c.deadline}` : ""}`, `Target: *${target}*${c.deadline ? ` by ${c.deadline}` : ""}`),
     ownerName ? t(lang, `Imeandaliwa na ${ownerName}`, `Organised by ${ownerName}`) : null,
