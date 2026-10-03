@@ -10,8 +10,8 @@ export async function contributeAction(code: string, form: FormData) {
   const message = String(form.get("message") ?? "").trim();
   let cents: number;
   try {
-    const custom = String(form.get("amount_custom") ?? "").trim();
-    cents = toCents(custom || String(form.get("amount") ?? ""));
+    cents = toCents(String(form.get("amount") ?? ""));
+    if (cents > 100_000_000) throw new Error("too large");
   } catch {
     redirect(`/c/${col.code}?err=amount`);
   }
