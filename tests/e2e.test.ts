@@ -97,6 +97,16 @@ async function main() {
   assert.ok((await import("../lib/services/links")).shareMessage(col, "Enzo", "sw").includes("Changia%20"), "Swahili card pre-fills Changia");
   console.log("✓ language follows the share card, then the user's own words");
 
+  // 1c. Simulator sessions are private: same persona, different browsers -> different phones
+  const { personaPhone, isPersona } = await import("../lib/sim");
+  const a = personaPhone("a".repeat(32), "organiser");
+  assert.equal(a, personaPhone("a".repeat(32), "organiser"), "stable within a session");
+  assert.notEqual(a, personaPhone("b".repeat(32), "organiser"), "different between sessions");
+  assert.match(a, /^2557\d{8}$/);
+  assert.match(personaPhone("a".repeat(32), "john"), /^4477\d{8}$/);
+  assert.ok(isPersona("p-ab12cd") && !isPersona("../x") && !isPersona("255700000101; drop"), "persona ids are validated");
+  console.log("✓ simulator sessions get private, stable test numbers");
+
   // 2. Contributor: open + payment link
   script.push({ tool: ["open_collection", { code: col.code }] }, { tool: ["create_payment_link", { code: col.code, amount: 40, display_name: "Amina" }] }, { text: "Here is your link" });
   await say(AMINA, `Habari, nataka kuchangia ${col.code}`);
