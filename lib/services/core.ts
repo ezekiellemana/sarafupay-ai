@@ -176,6 +176,63 @@ export async function listContributions(collectionId: string, status?: string) {
     .orderBy(desc(contributions.createdAt));
 }
 
+export type Supporter = { id: string; name: string; message: string | null; paidAt: Date };
+
+/**
+ * Public, paginated supporters list. Only first names, messages and times leave the server.
+ * `q` matches names (substring) or a payer's PayPal email — but email only as an exact,
+ * case-insensitive match, so the public page can't be used to harvest or guess emails.
+ */
+export async function searchSupporters(
+  collectionId: string,
+  opts: { q?: string; page?: number; pageSize?: number } = {},
+): Promise<{ items: Supporter[]; total: number; page: number; pages: number; byEmail: boolean }> {
+  const db = await getDb();
+  const pageSize = Math.min(50, Math.max(1, opts.pageSize ?? 8));
+  const q = (opts.q ?? "").trim().slice(0, 120);
+  const byEmail = q.includes("@");
+  const base = and(eq(contributions.collectionId, collectionId), eq(contributions.status, "paid"));
+  const where = !q
+    ? base
+    : byEmail
+      ? and(base, sql`lower(${contributions.payerEmail}) = ${q.toLowerCase()}`)
+      : and(base, sql`${contributions.displayName} ilike ${"%" + q.replace(/[\\%_]/g, (m) => "\\" + m) + "%"}`);
+  const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(contributions).where(where);
+  const total = Number(n ?? 0);
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  const page = Math.min(pages, Math.max(1, Math.floor(opts.page ?? 1)));
+  const rows = await db
+    .select({
+      id: contributions.id,
+      name: contributions.displayName,
+      message: contributions.message,
+      paidAt: sql<Date>`coalesce(${contributions.paidAt}, ${contributions.createdAt})`,
+    })
+    .from(contributions)
+    .where(where)
+    .orderBy(desc(sql`coalesce(${contributions.paidAt}, ${contributions.createdAt})`))
+    .limit(pageSize)
+    .offset((page - 1) * pageSize);
+  return {
+    items: rows.map((r) => ({
+      id: r.id,
+      name: firstName(r.name),
+      message: r.message?.trim() || null,
+      paidAt: new Date(r.paidAt),
+    })),
+    total,
+    page,
+    pages,
+    byEmail,
+  };
+}
+
+/** "Mary (London)" → "Mary", "baraka's uncle" → "Baraka's". Public pages show first names only. */
+export function firstName(name: string): string {
+  const w = name.trim().split(/\s+/)[0] ?? "";
+  return w ? w[0].toUpperCase() + w.slice(1) : "Anonymous";
+}
+
 export async function listPledges(collectionId: string) {
   const db = await getDb();
   return db.select().from(pledges).where(eq(pledges.collectionId, collectionId)).orderBy(asc(pledges.createdAt));
