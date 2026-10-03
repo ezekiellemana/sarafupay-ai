@@ -9,6 +9,7 @@ import { buildTools } from "./tools";
 import { systemPrompt } from "./prompt";
 import { withGeminiFallback } from "./models";
 import { langOf, t } from "../i18n";
+import { takeAiCall } from "../limits";
 
 export type Incoming = {
   phone: string; // digits for WhatsApp, "sim:<digits>" for simulator
@@ -70,6 +71,18 @@ async function process(msg: Incoming): Promise<void> {
     return sendTo(msg.phone, "⚙️ The AI brain isn't configured yet (missing GEMINI_API_KEY).");
   }
 
+  const gate = modelOverride ? { ok: true as const } : takeAiCall(msg.phone);
+  if (!gate.ok) {
+    if (!gate.notify) return;
+    const L = await langOf(msg.phone);
+    return sendTo(
+      msg.phone,
+      gate.reason === "sender"
+        ? t(L, "⏳ Ujumbe ni mwingi kwa muda mfupi. Tafadhali subiri dakika chache kisha uendelee.", "⏳ That's a lot of messages in a short time. Please wait a few minutes and continue.")
+        : t(L, "⏳ SarafuPay ina shughuli nyingi leo. Tafadhali jaribu tena baadaye.", "⏳ SarafuPay is very busy today. Please try again later."),
+    );
+  }
+
   const owned = await core.listOwnedCollections(user.id);
   const ownedSummary = await Promise.all(
     owned.slice(0, 5).map(async (c) => ({ code: c.code, title: c.title, progress: core.statusLine(c, await core.collectionStats(c)) })),
@@ -103,6 +116,7 @@ async function process(msg: Incoming): Promise<void> {
         messages,
         tools: buildTools(ctx),
         stopWhen: isStepCount(8),
+        maxOutputTokens: 1200, // WhatsApp replies are short; caps cost per step
         temperature: 0.3,
         maxRetries: 1,
       });
