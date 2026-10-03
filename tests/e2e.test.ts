@@ -125,6 +125,15 @@ async function main() {
   assert.ok(aminaMsgs.some((m) => m.includes("Malipo yamepokelewa")), "Tanzanian contributor gets a Swahili receipt");
   console.log("✓ capture settled once, receipt + owner alert sent");
 
+  // 3b. Public supporters list: first names only, email search is exact-match only
+  const byName = await core.searchSupporters(col.id, { q: "ami" });
+  assert.deepEqual(byName.items.map((s) => s.name), ["Amina"]);
+  assert.equal((await core.searchSupporters(col.id, { q: "AMINA@example.com" })).total, 1, "exact email finds own contribution");
+  assert.equal((await core.searchSupporters(col.id, { q: "amina@exam" })).total, 0, "partial email never matches");
+  assert.equal((await core.searchSupporters(col.id, { q: "%" })).total, 0, "LIKE wildcards are escaped");
+  assert.ok(!JSON.stringify(byName).includes("@"), "no emails leave the server");
+  console.log("✓ supporters search: names, exact email only, no leaks");
+
   // 4. Pledge by John, owner reminds
   await db.update(schema.users).set({ name: "John" }).where(eq(schema.users.phone, JOHN));
   script.push({ tool: ["update_my_profile", { name: "John" }] }, { tool: ["make_pledge", { code: col.code, amount: 25, due_date: "2026-11-30" }] }, { text: "Pledge saved" });
