@@ -57,3 +57,21 @@ export function takeAiCall(key: string, perWindowMax = PER_PHONE_MAX): LimitResu
 export function aiUsageToday() {
   return { day, calls: dayCount, limit: dailyLimit() };
 }
+
+const buckets = new Map<string, number[]>();
+/**
+ * Generic sliding-window counter for cheap abuse limits (e.g. simulator sends per IP).
+ * Returns false once `key` has had `max` hits within `windowMs`.
+ */
+export function hit(key: string, max: number, windowMs: number): boolean {
+  const now = Date.now();
+  const recent = (buckets.get(key) ?? []).filter((t) => now - t < windowMs);
+  if (recent.length >= max) {
+    buckets.set(key, recent);
+    return false;
+  }
+  recent.push(now);
+  buckets.set(key, recent);
+  if (buckets.size > 5000) buckets.clear();
+  return true;
+}
