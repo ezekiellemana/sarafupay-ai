@@ -153,7 +153,10 @@ export default async function Home() {
           <Logo />
           <p>
             PayPal Orders · Payouts · Invoicing via Agent Toolkit · Gemini · AG Studio · Render. Built for the PayPal AI
-            Hackathon 2026.
+            Hackathon 2026. ·{" "}
+            <Link href="/privacy" className="underline">
+              Privacy
+            </Link>
           </p>
         </div>
       </footer>
