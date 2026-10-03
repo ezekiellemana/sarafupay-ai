@@ -107,6 +107,7 @@ async function process(msg: Incoming): Promise<unknown> {
       active,
       channel: msg.channel,
       today: new Date().toISOString().slice(0, 10),
+      lang: await langOf(msg.phone),
     });
     const messages = [...(await history(msg.phone)), current];
     const run = (model: Parameters<typeof generateText>[0]["model"]) =>
