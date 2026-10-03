@@ -85,9 +85,21 @@ async function main() {
   assert.match(col.code, /^NEEMAWED\d\d$/);
   console.log("✓ collection created", col.code);
 
+  // 1b. Language: share-card commands carry the organiser's language for +255 newcomers
+  const { langOf } = await import("../lib/i18n");
+  const { logInbound } = await import("../lib/channels/messaging");
+  await logInbound("255700000505", "Contribute NEEMAWED11");
+  assert.equal(await langOf("255700000505"), "en", "English share card -> English for a +255 newcomer");
+  await logInbound("255700000606", "Changia NEEMAWED11");
+  assert.equal(await langOf("255700000606"), "sw", "Swahili share card -> Swahili");
+  await logInbound("255700000505", "Habari, nataka kuchangia");
+  assert.equal(await langOf("255700000505"), "sw", "a real Swahili message overrides the card hint");
+  assert.ok((await import("../lib/services/links")).shareMessage(col, "Enzo", "sw").includes("Changia%20"), "Swahili card pre-fills Changia");
+  console.log("✓ language follows the share card, then the user's own words");
+
   // 2. Contributor: open + payment link
   script.push({ tool: ["open_collection", { code: col.code }] }, { tool: ["create_payment_link", { code: col.code, amount: 40, display_name: "Amina" }] }, { text: "Here is your link" });
-  await say(AMINA, `Contribute ${col.code}`);
+  await say(AMINA, `Habari, nataka kuchangia ${col.code}`);
   const [ctb] = await db.select().from(schema.contributions);
   assert.equal(ctb.amountCents, 4000);
   assert.equal(ctb.status, "pending");
