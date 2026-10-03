@@ -79,6 +79,10 @@ Treasurer dashboard (/d/CODE) ─► AG Studio + Studio Agent Framework ─► /
 - **Sandbox pinned.** The Agent Toolkit is forced to `sandbox: true`.
 - **Resilient AI.** If a Gemini model is overloaded or rate-limited, the agent falls back through `gemini-3.8-flash` → `3.6-flash` → `3.5-flash` → `3.5-flash-lite`.
 
+### Built with the APIMatic Context Plugin
+
+Our PayPal SDK code was audited by an AI coding agent equipped with the **APIMatic Context Plugin for PayPal**. It caught a hidden "no timeout" default, retries that could never fire, and an over-broad error catch around capture, and fixed them. See [docs/APIMATIC_CONTEXT_PLUGIN.md](docs/APIMATIC_CONTEXT_PLUGIN.md).
+
 ## Run it locally (5 minutes)
 
 Requires Node 20.9+.
@@ -127,7 +131,7 @@ collection created · payment link · capture settled once (idempotent) with rec
 
 ## Built with
 
-PayPal Orders v2 · PayPal Payouts · PayPal Invoicing & Orders via **PayPal Agent Toolkit** · PayPal Webhooks · `@paypal/paypal-server-sdk` · Google Gemini · Vercel AI SDK · **AG Studio** (Studio Agent Framework) · Next.js 16 · Drizzle ORM · Postgres / PGlite · WhatsApp Cloud API · **Render**. Started from PayPal's official `hackathon-paypal-ag-grid-boilerplate`.
+PayPal Orders v2 · PayPal Payouts · PayPal Invoicing & Orders via **PayPal Agent Toolkit** · PayPal Webhooks · `@paypal/paypal-server-sdk` · Google Gemini · Vercel AI SDK · **AG Studio** (Studio Agent Framework) · Next.js 16 · Drizzle ORM · Postgres / PGlite · WhatsApp Cloud API · **Render** · **APIMatic Context Plugin**. Started from PayPal's official `hackathon-paypal-ag-grid-boilerplate`.
 
 ## Roadmap
 
