@@ -53,7 +53,7 @@ async function history(phone: string, limit = 16): Promise<ModelMessage[]> {
   );
 }
 
-async function process(msg: Incoming): Promise<void> {
+async function process(msg: Incoming): Promise<unknown> {
   const user = await core.getOrCreateUser(msg.phone, msg.channel, msg.profileName);
   const text = (msg.text ?? "").trim();
   await logInbound(msg.phone, text || (msg.audio ? "🎤 [voice note]" : "[unsupported message]"));
