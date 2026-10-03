@@ -33,10 +33,15 @@ const theme = (studioTheme as unknown as { withParams: (p: Record<string, unknow
   chartPaletteStrokes6Color: "#b88455",
 });
 
-function initialState(currency: string): AgReportState {
-  const v = (id: string, field: string, title: string, agg: "sum" | "count" = "sum") => ({
+function initialState(): AgReportState {
+  const kpi = (field: string, title: string, aggregation: "sum" | "count" = "sum") => ({
     type: "value",
-    dataMapping: { value: [{ id: field, aggregation: agg }] },
+    dataMapping: { value: [{ id: field, aggregation }] },
+    format: { title: { enabled: true, text: title } },
+  });
+  const grid = (title: string, cols: string[]) => ({
+    type: "grid",
+    dataMapping: { cols: cols.map((id) => ({ id })) },
     format: { title: { enabled: true, text: title } },
   });
   return {
@@ -44,10 +49,10 @@ function initialState(currency: string): AgReportState {
       {
         id: "overview",
         widgets: {
-          raised: v("raised", "contributions.amount", `Raised (${currency})`),
-          count: v("count", "contributions.payments", "Contributions"),
-          paidout: v("paidout", "payouts.amount", `Paid out (${currency})`),
-          pledged: v("pledged", "pledges.amount", `Pledged (${currency})`),
+          raised: kpi("contributions.amount", "Raised"),
+          count: kpi("contributions.contributor", "Contributions", "count"),
+          paidout: kpi("payouts.amount", "Paid out"),
+          pledged: kpi("pledges.amount", "Pledged"),
           byday: {
             type: "column-chart-grouped",
             dataMapping: {
@@ -64,62 +69,64 @@ function initialState(currency: string): AgReportState {
             },
             format: { title: { enabled: true, text: "By channel" } },
           },
-          ledger: {
-            type: "grid",
-            dataMapping: {
-              cols: [
-                { id: "contributions.contributor" },
-                { id: "contributions.amount" },
-                { id: "contributions.paid_on" },
-                { id: "contributions.channel" },
-                { id: "contributions.message" },
-                { id: "contributions.paypal_ref" },
-              ],
-            },
-            format: { title: { enabled: true, text: "Contributions ledger" } },
-          },
-          pledgeLedger: {
-            type: "grid",
-            dataMapping: {
-              cols: [
-                { id: "pledges.pledger" },
-                { id: "pledges.amount" },
-                { id: "pledges.due" },
-                { id: "pledges.status" },
-                { id: "pledges.reminded" },
-              ],
-            },
-            format: { title: { enabled: true, text: "Open pledges" } },
-          },
-          payouts: {
-            type: "grid",
-            dataMapping: {
-              cols: [
-                { id: "payouts.recipient" },
-                { id: "payouts.amount" },
-                { id: "payouts.purpose" },
-                { id: "payouts.status" },
-                { id: "payouts.sent_on" },
-              ],
-            },
-            format: { title: { enabled: true, text: "Payouts (transparency ledger)" } },
-          },
+          ledger: grid("Contributions", [
+            "contributions.contributor",
+            "contributions.amount",
+            "contributions.paid_on",
+            "contributions.channel",
+            "contributions.message",
+            "contributions.paypal_ref",
+          ]),
+          pledgeLedger: grid("Pledges", ["pledges.pledger", "pledges.amount", "pledges.due", "pledges.status", "pledges.reminded"]),
+          payouts: grid("Payouts · transparency ledger", ["payouts.recipient", "payouts.amount", "payouts.purpose", "payouts.status", "payouts.sent_on"]),
         },
         widgetLayout: {
           raised: { xTrack: 0, yTrack: 0, xSpan: 6, ySpan: 5 },
           count: { xTrack: 6, yTrack: 0, xSpan: 6, ySpan: 5 },
           paidout: { xTrack: 12, yTrack: 0, xSpan: 6, ySpan: 5 },
           pledged: { xTrack: 18, yTrack: 0, xSpan: 6, ySpan: 5 },
-          byday: { xTrack: 0, yTrack: 5, xSpan: 15, ySpan: 12 },
-          bychannel: { xTrack: 15, yTrack: 5, xSpan: 9, ySpan: 12 },
-          ledger: { xTrack: 0, yTrack: 17, xSpan: 24, ySpan: 12 },
-          pledgeLedger: { xTrack: 0, yTrack: 29, xSpan: 11, ySpan: 12 },
-          payouts: { xTrack: 11, yTrack: 29, xSpan: 13, ySpan: 12 },
+          byday: { xTrack: 0, yTrack: 5, xSpan: 16, ySpan: 12 },
+          bychannel: { xTrack: 16, yTrack: 5, xSpan: 8, ySpan: 12 },
+          ledger: { xTrack: 0, yTrack: 17, xSpan: 24, ySpan: 13 },
+          pledgeLedger: { xTrack: 0, yTrack: 30, xSpan: 11, ySpan: 11 },
+          payouts: { xTrack: 11, yTrack: 30, xSpan: 13, ySpan: 11 },
         },
       },
     ],
     selectedPageId: "overview",
+    // Report first: the data and widget panels start folded away (one click to open).
+    panels: { data: { collapsed: true }, edit: { collapsed: true } },
   } as unknown as AgReportState;
+}
+
+/** Friendly column names and money formatting, declared up front so empty tables still have a schema. */
+function sourceFields(currency: string) {
+  let money: Intl.NumberFormat;
+  try {
+    money = new Intl.NumberFormat("en-US", { style: "currency", currency, currencyDisplay: "narrowSymbol" });
+  } catch {
+    money = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  const text = (id: string, name: string) => ({ id, name, format: "textFormat" });
+  const amount = { id: "amount", name: "Amount", format: "currencyFormat", formatOptions: { format: money } };
+  const date = (id: string, name: string) => ({
+    id,
+    name,
+    format: "dateFormat",
+    accessor: (r: Record<string, string>) => (r[id] ? new Date(`${r[id]}T00:00:00`) : null),
+  });
+  return {
+    contributions: [
+      text("contributor", "Contributor"),
+      amount,
+      date("paid_on", "Paid on"),
+      text("channel", "Channel"),
+      text("message", "Message"),
+      text("paypal_ref", "PayPal ref"),
+    ],
+    pledges: [text("pledger", "Pledger"), amount, date("due", "Due"), text("status", "Status"), text("reminded", "Reminded")],
+    payouts: [text("recipient", "Recipient"), amount, text("purpose", "Purpose"), text("status", "Status"), date("sent_on", "Sent on")],
+  };
 }
 
 const TREASURER_PROMPT = `You are the SarafuPay Treasurer, an AI analyst for a group collection (michango) dashboard.
@@ -135,16 +142,16 @@ export default function StudioInner({ code, ownerKey, currency, data, licenseKey
   const headers = useMemo(() => ({ "x-collection": code, "x-owner-key": ownerKey }), [code, ownerKey]);
   const adapter = useMemo(() => geminiProxyAdapter({ endpoint: "/api/studio/llm", headers }), [headers]);
 
-  const sources = useMemo(
-    () => ({
+  const sources = useMemo(() => {
+    const fields = sourceFields(currency);
+    return {
       sources: [
-        { id: "contributions", data: data.contributions.length ? data.contributions.map((c) => ({ ...c, payments: 1 })) : [{ contributor: "(none yet)", amount: 0, channel: "-", paid_on: "", message: "", paypal_ref: "", payments: 0 }] },
-        { id: "pledges", data: data.pledges.length ? data.pledges : [{ pledger: "(none)", amount: 0, due: "", status: "-", reminded: "no" }] },
-        { id: "payouts", data: data.payouts.length ? data.payouts : [{ recipient: "(none yet)", amount: 0, purpose: "", status: "-", sent_on: "" }] },
+        { id: "contributions", name: "Contributions", data: data.contributions, fields: fields.contributions },
+        { id: "pledges", name: "Pledges", data: data.pledges, fields: fields.pledges },
+        { id: "payouts", name: "Payouts", data: data.payouts, fields: fields.payouts },
       ],
-    }),
-    [data],
-  );
+    };
+  }, [data, currency]);
 
   const ai = useMemo(
     () => (params: AgAiHarnessSetupParams) => {
@@ -208,7 +215,7 @@ export default function StudioInner({ code, ownerKey, currency, data, licenseKey
         style={{ height: "100%", width: "100%" }}
         theme={theme}
         data={sources as never}
-        initialState={initialState(currency)}
+        initialState={initialState()}
         mode="edit"
         panels={{ edit: { left: ["ai"], right: ["data", "edit"] } } as never}
         ai={ai as never}

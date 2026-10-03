@@ -1,11 +1,12 @@
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
-import { Logo, SandboxBadge } from "@/components/brand";
+import { Logo, Progress, SandboxBadge } from "@/components/brand";
 import { ownerCollection } from "@/lib/studio/auth";
 import { collectionStats, listContributions, listPayouts, listPledges } from "@/lib/services/core";
 import { money } from "@/lib/format";
 import { collectionUrl } from "@/lib/services/links";
 import { StudioDashboard, type DashboardData } from "./studio-dashboard";
+import { CopyLink } from "./copy-link";
 
 export const metadata = { title: "SarafuPay — treasurer dashboard", robots: { index: false } };
 
@@ -50,23 +51,37 @@ export default async function DashboardPage({ params, searchParams }: PageProps<
   return (
     <div className="flex h-dvh flex-col">
       <div className="kanga" />
-      <header className="flex flex-wrap items-center justify-between gap-4 border-b border-line px-5 py-3">
-        <div className="flex items-center gap-4">
+      <header className="border-b border-line bg-[#fffaf0]">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3 px-5 py-3">
           <Logo />
-          <div className="hidden h-8 w-px bg-line sm:block" />
-          <div>
-            <p className="font-display text-lg font-semibold leading-tight">{col.title}</p>
-            <p className="font-mono text-xs text-ink-soft">
-              {col.code} · {money(stats.raisedCents, col.currency)} of {money(col.targetCents, col.currency)} ({stats.percent}%) ·
-              balance {money(stats.availableCents, col.currency)}
-            </p>
+          <div className="hidden h-9 w-px bg-line md:block" />
+          <div className="min-w-0 flex-1 basis-64">
+            <div className="flex flex-wrap items-baseline gap-x-3">
+              <h1 className="truncate font-display text-xl font-semibold leading-tight">{col.title}</h1>
+              <span className="rounded-full bg-paper-2 px-2 py-0.5 font-mono text-[11px] text-ink-soft">{col.code}</span>
+              {col.status !== "active" ? <span className="text-xs font-semibold text-terracotta">closed</span> : null}
+            </div>
+            <div className="mt-1.5 flex items-center gap-3">
+              <div className="max-w-xs flex-1">
+                <Progress percent={stats.percent} />
+              </div>
+              <p className="shrink-0 text-xs text-ink-soft">
+                <strong className="text-ink">{stats.percent}%</strong> of {money(col.targetCents, col.currency)}
+                {col.deadline ? <> · closes {col.deadline}</> : null}
+              </p>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <SandboxBadge />
-          <a href={collectionUrl(col.code)} className="text-sm underline" target="_blank" rel="noreferrer">
-            Public page ↗
-          </a>
+          <div className="rounded-2xl bg-forest px-4 py-1.5 text-paper">
+            <p className="text-[10px] uppercase tracking-widest opacity-75">Balance to pay out</p>
+            <p className="font-display text-lg font-semibold leading-tight">{money(stats.availableCents, col.currency)}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <SandboxBadge />
+            <CopyLink url={collectionUrl(col.code)} />
+            <a href={collectionUrl(col.code)} className="rounded-full bg-ink px-3 py-1.5 text-sm text-paper" target="_blank" rel="noreferrer">
+              Public page ↗
+            </a>
+          </div>
         </div>
       </header>
       <p className="border-b border-line bg-paper-2 px-5 py-2 text-xs text-ink-soft md:hidden">
