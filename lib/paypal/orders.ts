@@ -1,6 +1,8 @@
 import "server-only";
 import {
+  ApiError,
   CheckoutPaymentIntent,
+  CustomError,
   OrdersController,
   PaypalExperienceUserAction,
   PaypalWalletContextShippingPreference,
@@ -74,15 +76,31 @@ function summarize(order: Order): CaptureResult {
   };
 }
 
+/** PayPal's error payload keeps wire field names (debug_id, details[].issue) — see CustomError. */
+function issuesOf(e: CustomError): string[] {
+  return (e.result?.details ?? []).map((d) => d.issue).filter(Boolean);
+}
+
 export async function captureOrder(orderId: string): Promise<CaptureResult> {
   const orders = new OrdersController(paypalSdk());
   try {
-    const { result } = await orders.captureOrder({ id: orderId, prefer: "return=representation" });
+    const { result } = await orders.captureOrder({
+      id: orderId,
+      paypalRequestId: `capture-${orderId}`, // idempotent: a retried capture returns the first result
+      prefer: "return=representation",
+    });
     return summarize(result);
   } catch (e) {
-    // Already captured (e.g. webhook won the race): read the order instead.
-    const { result } = await orders.getOrder({ id: orderId });
-    if (result.status === "COMPLETED") return summarize(result);
+    // Webhook and return URL can race: PayPal answers 422 ORDER_ALREADY_CAPTURED to the loser.
+    if (e instanceof CustomError && e.statusCode === 422 && issuesOf(e).includes("ORDER_ALREADY_CAPTURED")) {
+      const { result } = await orders.getOrder({ id: orderId });
+      return summarize(result);
+    }
+    if (e instanceof CustomError) {
+      console.error(`[paypal] capture ${orderId} failed: ${e.statusCode} ${e.result?.name} ${issuesOf(e).join(",")} debug_id=${e.result?.debug_id}`);
+    } else if (e instanceof ApiError) {
+      console.error(`[paypal] capture ${orderId} failed: HTTP ${e.statusCode}`, e.body);
+    }
     throw e;
   }
 }
