@@ -119,7 +119,7 @@ Without WhatsApp keys everything still works through the `/chat` simulator.
 1. Open **[/chat](https://sarafupay-ai.onrender.com/chat)** (or message the WhatsApp number above).
 2. As **Organiser**: `Hi, I want to start a collection for my sister's wedding, $500 by 20 December`.
 3. Switch to **Friend · Amina** → `Contribute <CODE>` → `$20` → open the link → pay with the sandbox buyer shown in the simulator.
-4. Back as Organiser: see the alert, ask `who has paid?`, then `pay caterer@example.com $10 for the deposit` and reply with the `CONFIRM` code.
+4. Back as Organiser: see the alert, ask `who has paid?`, then ask for a payout to the sandbox account shown in the simulator's help panel (e.g. `pay <that email> $5 for the deposit`) and reply with the `CONFIRM` code. Sandbox payouts only succeed to real sandbox accounts; a made-up email ends unclaimed.
 5. Watch the transparency update arrive for Amina, then ask for the **dashboard link** to open the AG Studio treasurer dashboard.
 6. Open the public page `/c/<CODE>`: the payout ledger, the supporters list (search by name) and the web checkout.
 
