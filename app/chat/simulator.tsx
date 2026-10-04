@@ -60,7 +60,7 @@ function initials(label: string) {
   return label.trim().slice(0, 1).toUpperCase();
 }
 
-export function Simulator({ buyer }: { buyer: { email: string; password: string } }) {
+export function Simulator({ buyer }: { buyer: { email: string; password: string; payee: string } }) {
   const search = useSearchParams();
   const [custom, setCustom] = useState<Persona[]>([]);
   const [active, setActive] = useState("organiser");
@@ -306,7 +306,17 @@ export function Simulator({ buyer }: { buyer: { email: string; password: string 
           <li>As <b>Organiser</b>, start a collection.</li>
           <li>Switch to <b>Amina</b> and send “Contribute CODE”.</li>
           <li>Open the PayPal link and pay with the sandbox buyer below.</li>
-          <li>Back as Organiser: see the alert, then try a payout.</li>
+          <li>
+            Back as Organiser: see the alert, then try a payout
+            {buyer.payee ? (
+              <>
+                , e.g. <span className="select-all break-all font-mono text-xs">pay {buyer.payee} $5 for the deposit</span>, and reply
+                with the CONFIRM code.
+              </>
+            ) : (
+              " to a PayPal sandbox account email, and reply with the CONFIRM code."
+            )}
+          </li>
         </ol>
         <button onClick={() => setShowLogin((s) => !s)} className="mt-3 font-medium text-forest-2 underline">
           {showLogin ? "Hide" : "Show"} sandbox buyer login

@@ -12,6 +12,9 @@ export default async function ChatPage() {
   const buyer = {
     email: process.env.SANDBOX_BUYER_EMAIL ?? "",
     password: process.env.SANDBOX_BUYER_PASSWORD ?? "",
+    // Payouts in the PayPal sandbox only succeed to a real sandbox account; a made-up
+    // email (e.g. caterer@example.com) ends UNCLAIMED and the payout is marked failed.
+    payee: process.env.SANDBOX_PAYEE_EMAIL ?? process.env.SANDBOX_BUYER_EMAIL ?? "",
   };
   return (
     <Suspense>
