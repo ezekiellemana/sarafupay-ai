@@ -118,7 +118,6 @@ async function process(msg: Incoming): Promise<unknown> {
         tools: buildTools(ctx),
         stopWhen: isStepCount(8),
         maxOutputTokens: 1200, // WhatsApp replies are short; caps cost per step
-        temperature: 0.3,
         maxRetries: 1,
       });
     const result = modelOverride ? await run(modelOverride) : await withGeminiFallback((m) => run(m));
