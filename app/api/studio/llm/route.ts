@@ -113,7 +113,6 @@ export async function POST(req: Request) {
           ? { type: "tool", toolName: body.toolChoice.name }
           : (body.toolChoice as "auto" | "none" | "required" | undefined),
       stopWhen: isStepCount(1),
-      temperature: 0.2,
       maxRetries: 1,
       });
     });
