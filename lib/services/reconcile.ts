@@ -1,4 +1,5 @@
 import "server-only";
+import { ApiError } from "@paypal/paypal-server-sdk";
 import { and, eq, gt, isNotNull, lt } from "drizzle-orm";
 import { getDb, schema } from "../db";
 import { getOrderSummary } from "../paypal/orders";
@@ -28,8 +29,33 @@ export type ReconcileReport = {
   checkedPayouts: number;
   finalizedPayouts: number;
   prunedDedupRows: number;
+  /** Orders PayPal no longer knows (expired before approval) or voided: closed as failed. */
+  closedOrders: number;
+  /** Real problems: the job run is marked failed so Render alerts us. */
   errors: string[];
+  /** Temporary PayPal trouble on one order (5xx, 429, timeout): retried on the next run. */
+  warnings: string[];
 };
+
+/** Turns any thrown value into a short, useful log line (SDK errors keep details off `message`). */
+export function describeError(e: unknown): string {
+  if (e instanceof ApiError) {
+    const r = e.result as { name?: string; message?: string; debug_id?: string } | undefined;
+    const body = typeof e.body === "string" ? e.body.slice(0, 120) : "";
+    return [`HTTP ${e.statusCode}`, r?.name, r?.message, r?.debug_id && `debug_id ${r.debug_id}`, !r && body]
+      .filter(Boolean)
+      .join(" · ");
+  }
+  if (e instanceof Error) return `${e.name}: ${e.message || "(no message)"}`;
+  return String(e);
+}
+
+const TRANSIENT = new Set([408, 429, 500, 502, 503, 504]);
+function isTransient(e: unknown): boolean {
+  if (e instanceof ApiError) return TRANSIENT.has(e.statusCode);
+  // axios transport failures (timeouts, resets) are not ApiError
+  return e instanceof Error && /timeout|ECONNRESET|ETIMEDOUT|EAI_AGAIN|socket hang up/i.test(`${e.name} ${e.message}`);
+}
 
 const BATCH = 25;
 const MIN_AGE_MS = 10 * 60_000;
@@ -51,7 +77,9 @@ export async function reconcile(deps: ReconcileDeps = realDeps): Promise<Reconci
     checkedPayouts: 0,
     finalizedPayouts: 0,
     prunedDedupRows: 0,
+    closedOrders: 0,
     errors: [],
+    warnings: [],
   };
 
   // 1. Missed captures.
@@ -74,6 +102,11 @@ export async function reconcile(deps: ReconcileDeps = realDeps): Promise<Reconci
     try {
       const order = await deps.getOrder(p.orderId);
       let settled;
+      if (order.status === "VOIDED") {
+        await closeContribution(p.id);
+        report.closedOrders++;
+        continue;
+      }
       if (order.status === "COMPLETED") {
         settled = await applyCapture(p.orderId, order.status, order.captureId, order.customId ?? p.id, order.payerEmail);
       } else if (order.status === "APPROVED") {
@@ -81,7 +114,15 @@ export async function reconcile(deps: ReconcileDeps = realDeps): Promise<Reconci
       }
       if (settled?.status === "paid") report.recoveredPayments++;
     } catch (e) {
-      report.errors.push(`order ${p.orderId}: ${e instanceof Error ? e.message : String(e)}`.slice(0, 200));
+      if (e instanceof ApiError && e.statusCode === 404) {
+        // Unapproved orders expire at PayPal; nothing was paid, so stop checking it.
+        await closeContribution(p.id);
+        report.closedOrders++;
+      } else if (isTransient(e)) {
+        report.warnings.push(`order ${p.orderId}: ${describeError(e)}`.slice(0, 240));
+      } else {
+        report.errors.push(`order ${p.orderId}: ${describeError(e)}`.slice(0, 240));
+      }
     }
   }
 
@@ -98,7 +139,8 @@ export async function reconcile(deps: ReconcileDeps = realDeps): Promise<Reconci
       const after = await refreshPayout(p.id);
       if (after && after.status !== "processing") report.finalizedPayouts++;
     } catch (e) {
-      report.errors.push(`payout ${p.id}: ${e instanceof Error ? e.message : String(e)}`.slice(0, 200));
+      const line = `payout ${p.id}: ${describeError(e)}`.slice(0, 240);
+      (isTransient(e) ? report.warnings : report.errors).push(line);
     }
   }
 
@@ -110,4 +152,12 @@ export async function reconcile(deps: ReconcileDeps = realDeps): Promise<Reconci
   report.prunedDedupRows = pruned.length;
 
   return report;
+
+  async function closeContribution(id: string) {
+    // Only a still-pending row is closed, so a late webhook that already settled it wins.
+    await db
+      .update(contributions)
+      .set({ status: "failed" })
+      .where(and(eq(contributions.id, id), eq(contributions.status, "pending")));
+  }
 }
