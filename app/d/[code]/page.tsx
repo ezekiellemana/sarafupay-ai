@@ -47,6 +47,16 @@ export default async function DashboardPage({ params, searchParams }: PageProps<
         status: p.status,
         sent_on: (p.executedAt ?? p.createdAt).toISOString().slice(0, 10),
       })),
+    summary: [
+      {
+        target: col.targetCents / 100,
+        raised: stats.raisedCents / 100,
+        funded: col.targetCents > 0 ? stats.raisedCents / col.targetCents : 0,
+        balance: stats.availableCents / 100,
+        paid_out: stats.paidOutCents / 100,
+        open_pledges: stats.openPledgeCents / 100,
+      },
+    ],
   };
   return (
     <div className="flex h-dvh flex-col">
