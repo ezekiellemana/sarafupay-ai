@@ -9,6 +9,7 @@
     "lint": "eslint",
     "test": "node --conditions=react-server --import tsx tests/e2e.test.ts",
     "typecheck": "tsc --noEmit",
+    "reconcile": "node scripts/cron-reconcile.mjs",
     "seed": "node --conditions=react-server --env-file-if-exists=.env.local --import tsx scripts/seed-demo.ts"
   },
   "dependencies": {
@@ -26,6 +27,7 @@
     "postgres": "^3.4.9",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "redis": "^5.12.1",
     "server-only": "^0.0.1",
     "zod": "^4.6.5"
   },

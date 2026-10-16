@@ -12,7 +12,7 @@ export async function POST(req: Request) {
   const text = String(body.text ?? "").slice(0, 2000);
   if (!isPersona(body.persona) || !text.trim()) return NextResponse.json({ error: "persona and text required" }, { status: 400 });
   // Per-person limits live in the agent; this stops one visitor spinning up endless sessions.
-  if (!hit(`sim-ip:${clientIp(req)}`, 60, 10 * 60_000)) return NextResponse.json({ error: "slow down" }, { status: 429 });
+  if (!(await hit(`sim-ip:${clientIp(req)}`, 60, 10 * 60_000))) return NextResponse.json({ error: "slow down" }, { status: 429 });
   await handleIncoming({ phone: `sim:${personaPhone(sid, body.persona)}`, channel: "sim", text });
   return NextResponse.json({ ok: true });
 }

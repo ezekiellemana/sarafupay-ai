@@ -89,7 +89,7 @@ export async function POST(req: Request) {
   const col = await ownerCollection(req.headers.get("x-collection"), req.headers.get("x-owner-key"));
   if (!col) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   if (!env.geminiApiKey()) return NextResponse.json({ error: "GEMINI_API_KEY missing" }, { status: 500 });
-  if (!takeAiCall(`studio:${col.code}`, 80).ok)
+  if (!(await takeAiCall(`studio:${col.code}`, 80)).ok)
     return NextResponse.json({ error: "Too many AI requests right now. Please wait a few minutes." }, { status: 429 });
 
   const body = (await req.json()) as AgLlmRequest;
