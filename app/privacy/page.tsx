@@ -6,7 +6,7 @@ export const metadata = {
   description: "How SarafuPay handles your data when you use the WhatsApp agent, web simulator and treasurer dashboard.",
 };
 
-const UPDATED = "3 October 2026";
+const UPDATED = "17 October 2026";
 
 export default function PrivacyPage() {
   return (
@@ -24,7 +24,7 @@ export default function PrivacyPage() {
         <h1 className="font-display text-4xl font-semibold">Privacy Policy</h1>
         <p className="mt-2 text-sm text-ink-soft">Last updated {UPDATED}</p>
 
-        <Section title="Who we are">
+        <Section title="Who I am">
           SarafuPay is a hackathon project by Ezekiel Lemana (Dodoma, Tanzania), built for the PayPal AI Hackathon 2026. It
           helps groups run collections (michango) through a WhatsApp agent. All payments run on the{" "}
           <strong>PayPal sandbox</strong>: no real money moves. Contact:{" "}
@@ -34,19 +34,19 @@ export default function PrivacyPage() {
           .
         </Section>
 
-        <Section title="What we collect">
+        <Section title="What I collect">
           <ul className="list-disc space-y-1 pl-5">
             <li>Your WhatsApp phone number and profile name, so the agent can reply to you.</li>
             <li>The messages and voice notes you send the agent, and its replies, kept as conversation history.</li>
             <li>The details you give: your name, collection titles, targets, pledges and an optional PayPal email for payouts.</li>
             <li>
-              Payment references returned by PayPal (order and capture IDs, payer name and email). We never see or store card
+              Payment references returned by PayPal (order and capture IDs, payer name and email). I never see or store card
               or bank details; checkout happens on PayPal.
             </li>
           </ul>
         </Section>
 
-        <Section title="How we use it">
+        <Section title="How I use it">
           Only to run the service: creating collections, sending pay links, receipts, reminders and transparency updates,
           preparing payouts that the organiser confirms with a one-time code, and showing the organiser&apos;s private
           dashboard. The public collection page shows totals, the payout ledger and each supporter&apos;s first name and
@@ -61,12 +61,12 @@ export default function PrivacyPage() {
             <li>PayPal (sandbox), to process test payments and payouts.</li>
             <li>Render, which hosts the app and its database.</li>
           </ul>
-          We do not sell your data or use it for advertising.
+          I do not sell your data or use it for advertising.
         </Section>
 
         <Section title="Retention and deletion">
-          Data is kept for the duration of the hackathon and its judging, then deleted. You can ask us to delete your data
-          at any time by emailing the address above; we will remove it within 7 days.
+          Data is kept for the duration of the hackathon and its judging, then deleted. You can ask me to delete your data
+          at any time by emailing the address above; I will remove it within 7 days.
         </Section>
 
         <Section title="Security">
@@ -75,7 +75,7 @@ export default function PrivacyPage() {
         </Section>
 
         <Section title="Changes">
-          If this policy changes we will update the date at the top of this page.
+          If this policy changes I will update the date at the top of this page.
         </Section>
       </main>
     </div>
