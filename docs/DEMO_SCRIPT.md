@@ -10,12 +10,12 @@ Rule reminders: show it running on the intended device (phone for WhatsApp), no 
 | 1:20–1:45 | Organiser: "Who hasn't paid?" → "Remind them" → pledger gets reminder (+ PayPal invoice via Agent Toolkit) | |
 | 1:45–2:20 | Organiser: "Pay Mama Lishe $300 for catering" → CONFIRM code → PayPal Payout → transparency update lands on contributor's phone | "The AI can prepare a payout, but money only moves when I type the one-time code. Then everyone sees where it went." |
 | 2:20–2:45 | AG Studio dashboard: Treasurer agent answers + builds a chart | "Treasurers get an AI dashboard built on AG Studio." |
-| 2:45–3:00 | Architecture slide: PayPal Orders · Payouts · Agent Toolkit · Gemini · AG Studio · Render | "SarafuPay: michango without the notebook." |
+| 2:45–3:00 | Architecture slide: PayPal Orders · Payouts · Agent Toolkit · Gemini · AG Studio · Render (Web Service, Postgres, Key Value, Cron Job) | "SarafuPay: michango without the notebook." |
 
 
 ## Recording tips
 
-- Wake the Render app first (open `/api/health`) so there is no cold-start delay on camera.
+- The web service is always on, but open `/api/health` first to confirm everything reports `true`.
 - Use a fresh collection; show the Swahili reply, then switch to English to show language matching.
 - Record the phone screen (scrcpy or the phone's recorder) and the browser for the PayPal sandbox checkout and dashboard.
 - Keep it under 3:00, upload to YouTube as **Public**, no copyrighted music.

@@ -27,12 +27,13 @@ SarafuPay is an AI agent you chat with on WhatsApp, in Swahili or English.
 - **Treasurer dashboard.** An AG Studio dashboard (KPIs, charts, contribution/pledge/payout ledgers) with a custom Treasurer agent that delegates to Studio's built-in agents.
 
 ## How we built it
-- **Next.js 16** on **Render** (web service + Postgres), started from PayPal's AG Grid hackathon boilerplate.
+- **Next.js 16** on **Render**, started from PayPal's AG Grid hackathon boilerplate. One Blueprint (`render.yaml`) defines four services: an always-on **Web Service**, **Postgres**, a private **Key Value** instance and a **Cron Job**.
 - **PayPal Orders v2** through `@paypal/paypal-server-sdk` for collecting; **PayPal Payouts** (REST) for disbursing; **PayPal Webhooks** (signature-verified) to settle captures, payouts and invoices.
 - **PayPal Agent Toolkit** tools (create/send invoice, reminders, QR code, get order) re-wrapped for Vercel AI SDK v7 and pinned to sandbox.
 - **Google Gemini** through the **Vercel AI SDK** with guarded domain tools and an automatic model fallback chain.
 - **WhatsApp Cloud API** with signed webhooks and message-ID de-duplication; a web simulator at `/chat` runs the same agent for judges without a phone. Each browser gets a **private session** (HttpOnly cookie, test numbers derived on the server), so many judges can test at once without seeing each other's chats.
-- **Cost guard:** per-sender and daily AI limits so a public demo can't drain the model budget.
+- **Cost guard:** per-sender and daily AI limits, kept in Render Key Value so they survive deploys, with an in-memory fallback if Key Value is unreachable.
+- **Self-healing payments:** a Render Cron Job runs every 15 minutes and re-checks pending PayPal orders. If a webhook was lost, it records the capture (or captures an approved order) through the same idempotent code as the webhook, finalises stuck payouts and prunes old de-dup rows.
 - **AG Studio** + Studio Agent Framework with a custom Gemini `AgLlmAdapter`.
 - **Drizzle ORM** on Postgres (PGlite locally, so it runs with zero setup) and an end-to-end test that drives the full money flow with a scripted LLM and a stubbed PayPal API.
 
@@ -41,6 +42,7 @@ SarafuPay is an AI agent you chat with on WhatsApp, in Swahili or English.
 - **Toolkit compatibility.** The Agent Toolkit targets an older AI SDK and defaults to production, so we wrapped its tools for v7 and forced sandbox mode.
 - **Real WhatsApp, real constraints.** Bots can't join normal groups, so we designed around forwardable share cards and `wa.me` links. Meta retries slow webhooks, which caused duplicate replies until we added de-duplication.
 - **Language.** Users switch between Swahili and English mid-conversation. We detect the language from their recent messages (and from which share card they tapped), and made every receipt, alert and update bilingual, using WhatsApp's own formatting.
+- **Webhooks can go missing.** A payment that PayPal captured but whose webhook never arrived would leave a contributor without a receipt. The reconcile cron job closes that gap without ever double-counting.
 - **Privacy on a public page.** Showing supporters builds trust, but emails and amounts must stay private. The public list shows first names only, and email search matches only a full, exact address, so it can't be used to harvest emails.
 
 ## Accomplishments that we're proud of
@@ -54,8 +56,8 @@ Trust is the product. The AI makes collecting easier, but the feature that matte
 
 ## What's next for SarafuPay
 - Mobile money (M-Pesa, Airtel Money) alongside PayPal for local contributors.
-- Approved WhatsApp message templates so reminders reach people outside the 24-hour window.
+- Go live with the approved `pledge_reminder` WhatsApp template (already built and tested) so reminders reach people outside the 24-hour window.
 - Recurring contributions for *vikoba* / *chama* savings groups, and multi-signer approvals for NGOs.
 
 ## Built with
-paypal, paypal-agent-toolkit, paypal-payouts, paypal-server-sdk, gemini, vercel-ai-sdk, ag-grid, ag-studio, next.js, typescript, react, postgresql, drizzle, whatsapp-cloud-api, render
+paypal, paypal-agent-toolkit, paypal-payouts, paypal-server-sdk, gemini, vercel-ai-sdk, ag-grid, ag-studio, next.js, typescript, react, postgresql, drizzle, whatsapp-cloud-api, render, render-postgres, render-key-value, render-cron-jobs, redis

@@ -56,9 +56,13 @@ WhatsApp (Meta Cloud API) ─┐                     ┌─ PayPal Orders v2 (se
 Web chat simulator (/chat) ┼─► Agent engine ─────┼─ PayPal Payouts v1 (REST)         disburse
 Public page (/c/CODE) ─────┘   Gemini via        ├─ PayPal Agent Toolkit             invoices, QR, order lookups
                                Vercel AI SDK v7  ├─ PayPal Webhooks (verified)        settle captures / payouts / invoices
-                               + guarded tools   └─ Postgres (Render) / PGlite (local)
+                               + guarded tools   ├─ Postgres (Render) / PGlite (local)
+                                                 └─ Key Value (Render): AI cost-guard counters
 Treasurer dashboard (/d/CODE) ─► AG Studio + Studio Agent Framework ─► /api/studio/llm (Gemini proxy)
+Render Cron Job (every 15 min) ─► /api/cron/reconcile ─► recover missed PayPal webhooks, finalise payouts
 ```
+
+Full deployment diagram: [Architecture on Render](#architecture-on-render).
 
 | Path | What lives there |
 |---|---|
@@ -77,8 +81,10 @@ Treasurer dashboard (/d/CODE) ─► AG Studio + Studio Agent Framework ─► /
 - **The LLM cannot move money.** It can only *prepare* a payout. Execution needs a one-time code from the organiser's own number (15-minute expiry, single use, balance re-checked, PayPal idempotency key).
 - **Role-based privacy.** Only the organiser sees full names and amounts. The public page shows totals, the payout ledger and supporters' first names; email search there only matches a full, exact address, so emails can't be harvested.
 - **Private simulator sessions.** An HttpOnly cookie per browser; test phone numbers are derived on the server, so visitors can't read or write each other's chats. Simulator history is deleted after 14 days.
-- **Cost guard.** Per-sender and daily AI limits keep a public demo from draining the model budget.
+- **Cost guard.** Per-sender and daily AI limits, stored in Render Key Value, keep a public demo from draining the model budget.
+- **Money converges.** If a PayPal webhook is lost, a Render Cron Job re-checks the order with PayPal and settles it through the same idempotent code, so no payment is missed and none is counted twice.
 - **Verified webhooks.** PayPal and Meta signatures are checked; duplicate WhatsApp deliveries are ignored so nobody gets double replies.
+- **Reminders outside 24 hours.** Pledge reminders use an approved WhatsApp template (`pledge_reminder`, with a PayPal pay button) when available; otherwise the organiser gets the person's pay link to forward.
 - **Sandbox pinned.** The Agent Toolkit is forced to `sandbox: true`.
 - **Resilient AI.** If a Gemini model is overloaded or rate-limited, the agent falls back through `gemini-3.8-flash` → `3.6-flash` → `3.5-flash` → `3.5-flash-lite`.
 
@@ -167,7 +173,7 @@ Try it in Swahili too: `Habari, nataka kuanzisha mchango wa msiba, lengo $200`.
 
 `npm test` runs the whole money flow end to end with a scripted LLM, in-memory Postgres and a stubbed PayPal API:
 
-collection created · language follows the share card, then the user's own words · private simulator sessions · payment link · capture settled once (idempotent) with receipt + organiser alert · Swahili receipt for a Tanzanian contributor · supporters search (no email leaks) · pledge + reminder · refused WhatsApp reminder not marked as sent · non-owner payout blocked · over-balance payout blocked · payout executed once by CONFIRM code (wrong code and replay rejected) · transparency broadcast · privacy for non-owners.
+collection created · language follows the share card, then the user's own words · private simulator sessions · payment link · capture settled once (idempotent) with receipt + organiser alert · Swahili receipt for a Tanzanian contributor · supporters search (no email leaks) · pledge + reminder · refused WhatsApp reminder not marked as sent · non-owner payout blocked · over-balance payout blocked · payout executed once by CONFIRM code (wrong code and replay rejected) · transparency broadcast · privacy for non-owners · reminder template outside the 24-hour window · Render Cron Job recovers lost-webhook payments exactly once · cost guard falls back to memory when Key Value is down.
 
 ## Built with
 
@@ -176,7 +182,6 @@ PayPal Orders v2 · PayPal Payouts · PayPal Invoicing & Orders via **PayPal Age
 ## Roadmap
 
 - Mobile money (M-Pesa, Airtel Money) collection and payouts alongside PayPal
-- Approved WhatsApp message templates for reminders outside the 24-hour window
 - Recurring contributions (vikoba / chama) and multi-organiser approvals for NGOs
 
 ## License
