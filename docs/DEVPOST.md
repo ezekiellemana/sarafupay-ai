@@ -26,7 +26,7 @@ SarafuPay is an AI agent you chat with on WhatsApp, in Swahili or English.
 - **Radical transparency.** Every payout is broadcast to all contributors and listed on a public collection page, next to a searchable, paginated supporters list (first names and messages only).
 - **Treasurer dashboard.** An AG Studio dashboard (KPIs, charts, contribution/pledge/payout ledgers) with a custom Treasurer agent that delegates to Studio's built-in agents.
 
-## How we built it
+## How I built it
 - **Next.js 16** on **Render**, started from PayPal's AG Grid hackathon boilerplate. One Blueprint (`render.yaml`) defines four services: an always-on **Web Service**, **Postgres**, a private **Key Value** instance and a **Cron Job**.
 - **PayPal Orders v2** through `@paypal/paypal-server-sdk` for collecting; **PayPal Payouts** (REST) for disbursing; **PayPal Webhooks** (signature-verified) to settle captures, payouts and invoices.
 - **PayPal Agent Toolkit** tools (create/send invoice, reminders, QR code, get order) re-wrapped for Vercel AI SDK v7 and pinned to sandbox.
@@ -37,7 +37,7 @@ SarafuPay is an AI agent you chat with on WhatsApp, in Swahili or English.
 - **AG Studio** + Studio Agent Framework with a custom Gemini `AgLlmAdapter`.
 - **Drizzle ORM** on Postgres (PGlite locally, so it runs with zero setup) and an end-to-end test that drives the full money flow with a scripted LLM and a stubbed PayPal API.
 
-## Challenges we ran into
+## Challenges I ran into
 - **Keeping an LLM away from money.** I made payouts a deterministic path: the model can only prepare one; execution needs a single-use, time-limited code typed by the owner, with the balance re-checked and a PayPal idempotency key.
 - **Toolkit compatibility.** The Agent Toolkit targets an older AI SDK and defaults to production, so I wrapped its tools for v7 and forced sandbox mode.
 - **Real WhatsApp, real constraints.** Bots can't join normal groups, so I designed around forwardable share cards and `wa.me` links. Meta retries slow webhooks, which caused duplicate replies until I added de-duplication.
@@ -45,13 +45,13 @@ SarafuPay is an AI agent you chat with on WhatsApp, in Swahili or English.
 - **Webhooks can go missing.** A payment that PayPal captured but whose webhook never arrived would leave a contributor without a receipt. The reconcile cron job closes that gap without ever double-counting.
 - **Privacy on a public page.** Showing supporters builds trust, but emails and amounts must stay private. The public list shows first names only, and email search matches only a full, exact address, so it can't be used to harvest emails.
 
-## Accomplishments that we're proud of
+## Accomplishments that I'm proud of
 - A full sandbox money loop running live on a real WhatsApp number: chat → PayPal order → capture → receipt → payout by confirmation code → transparency broadcast.
 - An agent that feels local: Swahili-first for Tanzanian users, voice notes supported.
 - Safety that doesn't depend on the model behaving.
 - A demo that's ready for many judges at once: private simulator sessions, cost limits, and an end-to-end test suite covering the money flow, privacy and session isolation.
 
-## What we learned
+## What I learned
 Trust is the product. The AI makes collecting easier, but the feature that matters most is a clear, shared record of where the money went. I also learned how much careful engineering sits around an LLM when real payments are involved: idempotency, webhooks, retries and human confirmation.
 
 ## What's next for SarafuPay
