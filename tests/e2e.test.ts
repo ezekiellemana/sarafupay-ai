@@ -257,6 +257,31 @@ async function main() {
   assert.equal((await inbox(JOHN)).filter((m) => /Payment received|Malipo yamepokelewa/.test(m)).length, 2, "one receipt per recovered payment");
   console.log("✓ reconcile cron recovers missed webhooks once, skips fresh orders");
 
+  // 9b. An order PayPal no longer knows (expired, 404) is closed; a 503 is only a warning.
+  const { ApiError } = await import("@paypal/paypal-server-sdk");
+  const sdkError = (statusCode: number) =>
+    new ApiError({ request: { method: "GET", url: "https://api-m.sandbox.paypal.com" }, response: { statusCode, headers: {}, body: "" } } as never, "");
+  const gone = await core.createContribution({ collection: col, contributorId: john.id, displayName: "John", amountCents: 900, source: "sim" });
+  const flaky = await core.createContribution({ collection: col, contributorId: john.id, displayName: "John", amountCents: 800, source: "sim" });
+  await db.update(schema.contributions).set({ paypalOrderId: "ORDER-GONE", createdAt: old }).where(eq(schema.contributions.id, gone.id));
+  await db.update(schema.contributions).set({ paypalOrderId: "ORDER-FLAKY", createdAt: old }).where(eq(schema.contributions.id, flaky.id));
+  const rc3 = await reconcile({
+    ...fakePaypal,
+    getOrder: async (id: string) => {
+      if (id === "ORDER-GONE") throw sdkError(404);
+      if (id === "ORDER-FLAKY") throw sdkError(503);
+      return fakePaypal.getOrder(id);
+    },
+  });
+  assert.equal(rc3.closedOrders, 1, "expired order closed");
+  assert.deepEqual(rc3.errors, [], "neither case fails the job");
+  assert.equal(rc3.warnings.length, 1);
+  assert.match(rc3.warnings[0], /ORDER-FLAKY: HTTP 503/, "warning carries the HTTP status");
+  const after2 = await db.select().from(schema.contributions).where(eq(schema.contributions.contributorId, john.id));
+  assert.equal(after2.find((c) => c.id === gone.id)?.status, "failed");
+  assert.equal(after2.find((c) => c.id === flaky.id)?.status, "pending", "transient error: retried next run");
+  console.log("✓ reconcile closes expired orders and treats PayPal hiccups as warnings");
+
   // 10. Cost guard without Key Value falls back to memory and still limits.
   const limits = await import("../lib/limits");
   for (let i = 0; i < 3; i++) assert.equal(await limits.hit("test-ip", 3, 60_000), true);
