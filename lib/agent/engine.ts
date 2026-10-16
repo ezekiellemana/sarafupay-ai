@@ -71,7 +71,7 @@ async function process(msg: Incoming): Promise<unknown> {
     return sendTo(msg.phone, "⚙️ The AI brain isn't configured yet (missing GEMINI_API_KEY).");
   }
 
-  const gate = modelOverride ? { ok: true as const } : takeAiCall(msg.phone);
+  const gate = modelOverride ? { ok: true as const } : await takeAiCall(msg.phone);
   if (!gate.ok) {
     if (!gate.notify) return;
     const L = await langOf(msg.phone);

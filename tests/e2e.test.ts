@@ -36,6 +36,8 @@ const model = new MockLanguageModelV4({
 // --- PayPal REST stub (OAuth + Payouts) ---
 const realFetch = globalThis.fetch;
 const payoutCalls: unknown[] = [];
+const reconcileOrders: Record<string, string> = {}; // PayPal order id -> contribution id
+const captureCalls: string[] = [];
 let templateApproved = false; // flips mid-test to simulate Meta approving the reminder template
 const templateCalls: { to: string; template: { name: string; language: { code: string }; components: { type: string; parameters: { text: string }[] }[] } }[] = [];
 globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -213,6 +215,54 @@ async function main() {
   const rep = (await (buildTools({ user: john, channel: "sim" }).collection_report as { execute: (i: unknown, o: unknown) => Promise<Record<string, unknown>> }).execute({ code: col.code }, {})) as Record<string, unknown>;
   assert.ok(!("contributions" in rep), "no names for non-owner");
   console.log("✓ privacy: non-owner sees totals only");
+
+  // 9. Render Cron Job safety net: payments whose webhook never arrived still settle, exactly once.
+  const { reconcile } = await import("../lib/services/reconcile");
+  const late1 = await core.createContribution({ collection: col, contributorId: john.id, displayName: "John", amountCents: 2500, source: "sim" });
+  const late2 = await core.createContribution({ collection: col, contributorId: john.id, displayName: "John", amountCents: 1500, source: "sim" });
+  const fresh = await core.createContribution({ collection: col, contributorId: john.id, displayName: "John", amountCents: 700, source: "sim" });
+  reconcileOrders["ORDER-COMPLETED"] = late1.id;
+  reconcileOrders["ORDER-APPROVED"] = late2.id;
+  reconcileOrders["ORDER-FRESH"] = fresh.id;
+  const old = new Date(Date.now() - 20 * 60_000);
+  await db.update(schema.contributions).set({ paypalOrderId: "ORDER-COMPLETED", createdAt: old }).where(eq(schema.contributions.id, late1.id));
+  await db.update(schema.contributions).set({ paypalOrderId: "ORDER-APPROVED", createdAt: old }).where(eq(schema.contributions.id, late2.id));
+  await db.update(schema.contributions).set({ paypalOrderId: "ORDER-FRESH" }).where(eq(schema.contributions.id, fresh.id)); // < 10 min: left to the webhook
+  // Fake PayPal for the job: ORDER-COMPLETED was captured but its webhook was lost;
+  // ORDER-APPROVED was approved but the buyer never came back to the return URL.
+  const fakePaypal = {
+    getOrder: async (id: string) => ({
+      status: id === "ORDER-COMPLETED" ? "COMPLETED" : "APPROVED",
+      captureId: id === "ORDER-COMPLETED" ? "CAP-LATE1" : undefined,
+      customId: reconcileOrders[id],
+      payerEmail: "john@example.com",
+    }),
+    settle: async (id: string) => {
+      captureCalls.push(id);
+      return core.applyCapture(id, "COMPLETED", `CAP-${id}`, reconcileOrders[id], "john@example.com");
+    },
+  };
+  const rc1 = await reconcile(fakePaypal);
+  assert.equal(rc1.checkedOrders, 2, "only orders older than 10 minutes are checked");
+  assert.equal(rc1.recoveredPayments, 2, "completed + approved orders both recovered");
+  assert.deepEqual(captureCalls, ["ORDER-APPROVED"], "only the approved order is captured");
+  assert.deepEqual(rc1.errors, []);
+  const after = await db.select().from(schema.contributions).where(eq(schema.contributions.contributorId, john.id));
+  assert.equal(after.find((c) => c.id === late1.id)?.status, "paid");
+  assert.equal(after.find((c) => c.id === late2.id)?.status, "paid");
+  assert.equal(after.find((c) => c.id === fresh.id)?.status, "pending");
+  const rc2 = await reconcile(fakePaypal);
+  assert.equal(rc2.recoveredPayments, 0, "second run is a no-op");
+  assert.equal(captureCalls.length, 1, "no double capture");
+  assert.equal((await inbox(JOHN)).filter((m) => /Payment received|Malipo yamepokelewa/.test(m)).length, 2, "one receipt per recovered payment");
+  console.log("✓ reconcile cron recovers missed webhooks once, skips fresh orders");
+
+  // 10. Cost guard without Key Value falls back to memory and still limits.
+  const limits = await import("../lib/limits");
+  for (let i = 0; i < 3; i++) assert.equal(await limits.hit("test-ip", 3, 60_000), true);
+  assert.equal(await limits.hit("test-ip", 3, 60_000), false, "4th hit in window is refused");
+  assert.equal((await limits.aiUsageToday()).store, "memory");
+  console.log("✓ cost guard works without Key Value (in-memory fallback)");
 
   console.log("\nAll e2e checks passed ✅");
   process.exit(0);

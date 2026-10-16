@@ -104,3 +104,10 @@ export async function captureOrder(orderId: string): Promise<CaptureResult> {
     throw e;
   }
 }
+
+/** Reads an order without changing it (used by the reconcile job to recover missed webhooks). */
+export async function getOrderSummary(orderId: string): Promise<CaptureResult> {
+  const orders = new OrdersController(paypalSdk());
+  const { result } = await orders.getOrder({ id: orderId });
+  return summarize(result);
+}

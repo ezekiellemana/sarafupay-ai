@@ -3,6 +3,7 @@ import { env, paypalConfigured, whatsappConfigured } from "@/lib/env";
 import { getDb } from "@/lib/db";
 import { sql } from "drizzle-orm";
 import { aiUsageToday } from "@/lib/limits";
+import { kvConfigured } from "@/lib/kv";
 
 export async function GET() {
   let db = false;
@@ -20,7 +21,8 @@ export async function GET() {
       gemini: Boolean(env.geminiApiKey()),
       whatsapp: whatsappConfigured(),
       simulator: env.simulatorEnabled(),
-      ai_today: aiUsageToday(),
+      keyvalue: kvConfigured(),
+      ai_today: await aiUsageToday(),
     },
     { status: db ? 200 : 503 },
   );
