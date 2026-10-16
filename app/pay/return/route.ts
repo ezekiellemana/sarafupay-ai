@@ -5,7 +5,7 @@ import { getCollectionById, settleOrder } from "@/lib/services/core";
 export async function GET(req: Request) {
   const orderId = new URL(req.url).searchParams.get("token");
   if (!orderId) redirect("/pay/error?m=Missing%20order");
-  let target = "/pay/error?m=We%20could%20not%20confirm%20this%20payment";
+  let target = "/pay/error?m=This%20payment%20could%20not%20be%20confirmed";
   try {
     const ctb = await settleOrder(orderId);
     const col = ctb ? await getCollectionById(ctb.collectionId) : undefined;

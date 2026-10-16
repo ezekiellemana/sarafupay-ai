@@ -90,7 +90,7 @@ Full deployment diagram: [Architecture on Render](#architecture-on-render).
 
 ### Built with the APIMatic Context Plugin
 
-Our PayPal SDK code was audited by an AI coding agent equipped with the **APIMatic Context Plugin for PayPal**. It caught a hidden "no timeout" default, retries that could never fire, and an over-broad error catch around capture, and fixed them. See [docs/APIMATIC_CONTEXT_PLUGIN.md](docs/APIMATIC_CONTEXT_PLUGIN.md).
+SarafuPay's PayPal SDK code was audited by an AI coding agent equipped with the **APIMatic Context Plugin for PayPal**. It caught a hidden "no timeout" default, retries that could never fire, and an over-broad error catch around capture, and fixed them. See [docs/APIMATIC_CONTEXT_PLUGIN.md](docs/APIMATIC_CONTEXT_PLUGIN.md).
 
 ## Run it locally (5 minutes)
 

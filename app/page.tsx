@@ -62,7 +62,7 @@ export default async function Home() {
           <div className="rise d3 mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             <Link href="/chat" className="btn btn-primary justify-center">Open the chat simulator →</Link>
             {wa ? (
-              <a href={wa} className="btn btn-ghost justify-center" target="_blank" rel="noreferrer">Message us on WhatsApp</a>
+              <a href={wa} className="btn btn-ghost justify-center" target="_blank" rel="noreferrer">Message SarafuPay on WhatsApp</a>
             ) : null}
           </div>
           <dl className="rise d4 mt-10 grid max-w-lg grid-cols-3 gap-4 border-t border-line pt-6 sm:gap-6">

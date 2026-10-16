@@ -13,7 +13,7 @@
 ---
 
 ## Inspiration
-In Tanzania and across East Africa, *michango* (group contributions) pay for life's biggest moments: weddings, funerals, hospital bills, school fees. It all happens in WhatsApp groups. One trusted person collects money by hand, keeps a notebook, chases pledges one by one, and posts screenshots to prove where the money went. It's exhausting for the organiser, and when the numbers don't add up, friendships suffer. We wanted to keep the place people already gather, WhatsApp, and take away the notebook.
+In Tanzania and across East Africa, *michango* (group contributions) pay for life's biggest moments: weddings, funerals, hospital bills, school fees. It all happens in WhatsApp groups. One trusted person collects money by hand, keeps a notebook, chases pledges one by one, and posts screenshots to prove where the money went. It's exhausting for the organiser, and when the numbers don't add up, friendships suffer. I wanted to keep the place people already gather, WhatsApp, and take away the notebook.
 
 ## What it does
 SarafuPay is an AI agent you chat with on WhatsApp, in Swahili or English.
@@ -38,10 +38,10 @@ SarafuPay is an AI agent you chat with on WhatsApp, in Swahili or English.
 - **Drizzle ORM** on Postgres (PGlite locally, so it runs with zero setup) and an end-to-end test that drives the full money flow with a scripted LLM and a stubbed PayPal API.
 
 ## Challenges we ran into
-- **Keeping an LLM away from money.** We made payouts a deterministic path: the model can only prepare one; execution needs a single-use, time-limited code typed by the owner, with the balance re-checked and a PayPal idempotency key.
-- **Toolkit compatibility.** The Agent Toolkit targets an older AI SDK and defaults to production, so we wrapped its tools for v7 and forced sandbox mode.
-- **Real WhatsApp, real constraints.** Bots can't join normal groups, so we designed around forwardable share cards and `wa.me` links. Meta retries slow webhooks, which caused duplicate replies until we added de-duplication.
-- **Language.** Users switch between Swahili and English mid-conversation. We detect the language from their recent messages (and from which share card they tapped), and made every receipt, alert and update bilingual, using WhatsApp's own formatting.
+- **Keeping an LLM away from money.** I made payouts a deterministic path: the model can only prepare one; execution needs a single-use, time-limited code typed by the owner, with the balance re-checked and a PayPal idempotency key.
+- **Toolkit compatibility.** The Agent Toolkit targets an older AI SDK and defaults to production, so I wrapped its tools for v7 and forced sandbox mode.
+- **Real WhatsApp, real constraints.** Bots can't join normal groups, so I designed around forwardable share cards and `wa.me` links. Meta retries slow webhooks, which caused duplicate replies until I added de-duplication.
+- **Language.** Users switch between Swahili and English mid-conversation. The agent detects the language from their recent messages (and from which share card they tapped), and I made every receipt, alert and update bilingual, using WhatsApp's own formatting.
 - **Webhooks can go missing.** A payment that PayPal captured but whose webhook never arrived would leave a contributor without a receipt. The reconcile cron job closes that gap without ever double-counting.
 - **Privacy on a public page.** Showing supporters builds trust, but emails and amounts must stay private. The public list shows first names only, and email search matches only a full, exact address, so it can't be used to harvest emails.
 
@@ -52,7 +52,7 @@ SarafuPay is an AI agent you chat with on WhatsApp, in Swahili or English.
 - A demo that's ready for many judges at once: private simulator sessions, cost limits, and an end-to-end test suite covering the money flow, privacy and session isolation.
 
 ## What we learned
-Trust is the product. The AI makes collecting easier, but the feature that matters most is a clear, shared record of where the money went. We also learned how much careful engineering sits around an LLM when real payments are involved: idempotency, webhooks, retries and human confirmation.
+Trust is the product. The AI makes collecting easier, but the feature that matters most is a clear, shared record of where the money went. I also learned how much careful engineering sits around an LLM when real payments are involved: idempotency, webhooks, retries and human confirmation.
 
 ## What's next for SarafuPay
 - Mobile money (M-Pesa, Airtel Money) alongside PayPal for local contributors.

@@ -25,7 +25,7 @@ export default async function Thanks({ params, searchParams }: PageProps<"/c/[co
           <p className="mt-2 text-ink-soft">
             {paid
               ? `${money(ctb!.amountCents, ctb!.currency)} received for ${col.title}.`
-              : "We're waiting for PayPal to confirm your payment. You'll get a receipt in chat."}
+              : "Waiting for PayPal to confirm your payment. You'll get a receipt in chat."}
           </p>
           {paid && ctb?.paypalCaptureId ? <p className="mt-2 font-mono text-xs text-ink-soft">PayPal ref {ctb.paypalCaptureId}</p> : null}
           <div className="mt-6 text-left">
