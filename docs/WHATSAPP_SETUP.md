@@ -26,7 +26,7 @@ POST /{WABA_ID}/subscribed_apps
 - Verify token: any random string, the same value as `WHATSAPP_VERIFY_TOKEN`
 - Subscribe to the **messages** field.
 
-On a sleeping free Render instance, wake the app first (open `/api/health`) so Meta's verification request doesn't time out.
+If you deploy on a free Render instance (which sleeps), wake the app first (open `/api/health`) so Meta's verification request doesn't time out. The live SarafuPay service is always on.
 
 ## 4. Environment variables
 
@@ -41,5 +41,5 @@ On a sleeping free Render instance, wake the app first (open `/api/health`) so M
 ## Notes
 
 - **Duplicate deliveries:** Meta retries a webhook if the response is slow (for example, on a cold start). The handler answers immediately and de-duplicates by message ID in the `processed_messages` table.
-- **24-hour window:** free-form messages can only be sent within 24 hours of the user's last message. Reminders to people who haven't messaged recently need approved message templates (on the roadmap).
+- **24-hour window:** free-form messages can only be sent within 24 hours of the user's last message. For pledge reminders outside it, create a UTILITY template named `pledge_reminder` in WhatsApp Manager with four body variables (name, amount, collection, due date) and a URL button whose suffix is the contribution id. Set `WHATSAPP_REMINDER_TEMPLATE` if you use another name, or `off` to disable it. Until it is approved, the organiser gets the person's pay link to forward instead.
 - **Groups:** Cloud API bots can't join ordinary WhatsApp groups, so organisers forward the share card (with a `wa.me` deep link) into their group instead.
