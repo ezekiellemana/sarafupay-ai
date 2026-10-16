@@ -6,6 +6,8 @@ export type DashboardData = {
   contributions: { contributor: string; amount: number; channel: string; paid_on: string; message: string; paypal_ref: string }[];
   pledges: { pledger: string; amount: number; due: string; status: string; reminded: string }[];
   payouts: { recipient: string; amount: number; purpose: string; status: string; sent_on: string }[];
+  /** One row of headline numbers, so KPI tiles and the target gauge read the same figures as the header. */
+  summary: { target: number; raised: number; funded: number; balance: number; paid_out: number; open_pledges: number }[];
 };
 
 export type StudioProps = {
