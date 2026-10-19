@@ -41,7 +41,7 @@ Across East Africa and the diaspora, money for weddings, funerals, hospital bill
 | **Organiser** | "Pay Mama Lishe $300 for catering" | AI prepares a **PayPal Payout**; money moves **only** after the organiser replies `CONFIRM <6-digit code>`, a step the LLM never touches |
 | **Everyone** | – | Every payout is broadcast to contributors as a **transparency update** and listed on the public page `/c/CODE`, next to a searchable, paginated supporters list (first names and messages only) |
 | **Anyone with the link** | Public page `/c/CODE` | Chip in on the web: one currency-aware amount field with live formatting and quick picks, then PayPal checkout |
-| **Treasurer** | Private dashboard `/d/CODE` | **AG Studio** dashboard (KPIs, charts, contribution/pledge/payout ledgers) with a custom **Treasurer agent** that delegates to Studio's built-in agents |
+| **Treasurer** | Private dashboard `/d/CODE` | **AG Studio** dashboard (KPIs, charts, contribution and payout ledgers), a custom **Pledge scoreboard** widget, and a custom **Treasurer agent** that delegates to Studio's built-in agents |
 
 ### Speaks the user's language
 
@@ -74,7 +74,7 @@ Full deployment diagram: [Architecture on Render](#architecture-on-render).
 | `app/api/whatsapp` | Signed Meta webhook with message-ID de-duplication (Meta retries on slow responses) |
 | `lib/services/reconcile.ts` | Safety net run by the Render Cron Job: recovers payments whose webhook was missed, finalises stuck payouts, prunes old de-dup rows |
 | `lib/limits.ts`, `lib/kv.ts` | AI cost guard (per sender + daily) on Render Key Value, with an in-memory fallback |
-| `app/d/[code]` | AG Studio with branded theme, custom `Treasurer` agent and tools, running on Gemini via a custom `AgLlmAdapter` |
+| `app/d/[code]` | AG Studio with branded theme, a custom `pledge-scoreboard` widget (`pledge-scoreboard.tsx`), status-pill cell renderers, and a custom `Treasurer` agent and tools running on Gemini via a custom `AgLlmAdapter` |
 
 ### Safety by design
 

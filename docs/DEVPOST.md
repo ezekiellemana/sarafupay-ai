@@ -24,7 +24,8 @@ SarafuPay is an AI agent you chat with on WhatsApp, in Swahili or English.
 - **Answers from live data.** "Who hasn't paid?", "How much do we have?", "Send me a report".
 - **Payouts with a human in the loop.** "Pay Mama Lishe $300 for catering" prepares a PayPal Payout, but money moves only when the organiser replies with a one-time `CONFIRM` code from their own number.
 - **Radical transparency.** Every payout is broadcast to all contributors and listed on a public collection page, next to a searchable, paginated supporters list (first names and messages only).
-- **Treasurer dashboard.** An AG Studio dashboard (KPIs, charts, contribution/pledge/payout ledgers) with a custom Treasurer agent that delegates to Studio's built-in agents.
+- **Treasurer dashboard.** An AG Studio dashboard (KPIs, charts, contribution and payout ledgers) with a custom Treasurer agent that delegates to Studio's built-in agents.
+- **Pledge scoreboard.** A custom AG Studio widget that shows pledges as a friendly scoreboard, not a debt list: promises kept, money still to come, who is past their date, and a "Send friendly nudges" button (with a confirm step) that sends each person a WhatsApp reminder with their own PayPal link. Clicking a person cross-filters the dashboard. It's in the widget menu, so organisers can add it to any page.
 
 ## How I built it
 SarafuPay AI is a new build for this hackathon: the whole codebase was written during the submission period (first commit Oct 2, 2026).

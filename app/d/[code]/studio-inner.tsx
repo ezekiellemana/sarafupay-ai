@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { AgStudio, AgStudioProvider } from "ag-studio-react";
+import { AgStudio, AgStudioProvider, createWidgets } from "ag-studio-react";
 import {
   AgStudioAiModule,
   createAiHarness,
@@ -12,6 +12,7 @@ import {
 } from "ag-studio";
 import { geminiProxyAdapter } from "@/lib/studio/adapter";
 import type { StudioProps } from "./studio-dashboard";
+import { pledgeScoreboardDefinition, type NudgeResult } from "./pledge-scoreboard";
 
 const theme = (studioTheme as unknown as { withParams: (p: Record<string, unknown>) => typeof studioTheme }).withParams({
   accentColor: "#0e3b2c",
@@ -161,7 +162,17 @@ function initialState(target: number, currency: string): AgReportState {
               },
             },
           },
-          pledgeLedger: grid("Pledges", ["pledges.pledger", "pledges.amount", "pledges.due", "pledges.status", "pledges.reminded"], "Promises still to be paid"),
+          scoreboard: {
+            type: "pledge-scoreboard",
+            dataMapping: {
+              person: [{ id: "pledges.pledger" }],
+              amount: [{ id: "pledges.amount", aggregation: "sum" }],
+              status: [{ id: "pledges.status" }],
+              due: [{ id: "pledges.due" }],
+              reminded: [{ id: "pledges.reminded" }],
+            },
+            format: chartTitle("Pledge scoreboard", "Promises kept, and who still has to pay"),
+          },
           payouts: grid(
             "Payouts · transparency ledger",
             ["payouts.recipient", "payouts.amount", "payouts.purpose", "payouts.status", "payouts.sent_on"],
@@ -180,8 +191,8 @@ function initialState(target: number, currency: string): AgReportState {
           bychannel: { xTrack: 17, yTrack: 6, xSpan: 7, ySpan: 12 },
           ledger: { xTrack: 0, yTrack: 18, xSpan: 16, ySpan: 17 },
           top: { xTrack: 16, yTrack: 18, xSpan: 8, ySpan: 17 },
-          pledgeLedger: { xTrack: 0, yTrack: 35, xSpan: 11, ySpan: 13 },
-          payouts: { xTrack: 11, yTrack: 35, xSpan: 13, ySpan: 13 },
+          scoreboard: { xTrack: 0, yTrack: 35, xSpan: 9, ySpan: 22 },
+          payouts: { xTrack: 9, yTrack: 35, xSpan: 15, ySpan: 22 },
         },
       },
     ],
@@ -300,17 +311,36 @@ export default function StudioInner({ code, ownerKey, currency, data, licenseKey
     };
   }, [data, currency]);
 
+  const call = useMemo(
+    () => async (action: string) => {
+      const res = await fetch("/api/studio/action", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...headers },
+        body: JSON.stringify({ action }),
+      });
+      return res.json();
+    },
+    [headers],
+  );
+
+  // Default widgets + our Pledge scoreboard; grids get the status-pill renderer.
+  const widgets = useMemo(() => {
+    const scoreboard = pledgeScoreboardDefinition({
+      currency,
+      onNudge: async () => (await call("remind_pledgers")) as NudgeResult,
+    });
+    return (config: { menu: Array<{ label: string; widgetIds: readonly string[] }> }) =>
+      withStatusPills(
+        createWidgets({
+          additionalTypes: [scoreboard],
+          menu: [...config.menu, { label: "SarafuPay", widgetIds: ["pledge-scoreboard"] }],
+        } as never) as never,
+      );
+  }, [call, currency]);
+
   const ai = useMemo(
     () => (params: AgAiHarnessSetupParams) => {
       const api = params.api;
-      const call = async (action: string) => {
-        const res = await fetch("/api/studio/action", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...headers },
-          body: JSON.stringify({ action }),
-        });
-        return res.json();
-      };
       const summaryTool = api.defineAiTool({
         name: "collection_summary",
         description: "Live headline numbers for this collection from SarafuPay: target, raised, % funded, paid out, balance, open pledges, deadline.",
@@ -354,7 +384,7 @@ export default function StudioInner({ code, ownerKey, currency, data, licenseKey
         ],
       }));
     },
-    [adapter, headers],
+    [adapter, call],
   );
 
   return (
@@ -364,7 +394,7 @@ export default function StudioInner({ code, ownerKey, currency, data, licenseKey
         theme={theme}
         data={sources as never}
         initialState={initialState(data.summary[0]?.target ?? 0, currency)}
-        widgets={withStatusPills as never}
+        widgets={widgets as never}
         mode="edit"
         panels={{ edit: { left: ["ai"], right: ["data", "edit"] } } as never}
         ai={ai as never}
