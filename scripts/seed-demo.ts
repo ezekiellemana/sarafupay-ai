@@ -34,10 +34,19 @@ async function main() {
     await db.update(schema.contributions).set({ status: "paid", paidAt, paypalCaptureId: `DEMO${String(day).padStart(4, "0")}CAPTURE` }).where(eq(schema.contributions.id, c.id));
     day++;
   }
-  for (const [name, cents, due] of [["Selemani", 5000, "2026-11-30"], ["Agnes", 3000, "2026-12-05"], ["Musa", 10000, "2026-12-10"]] as const) {
+  // Pledges relative to today, so the scoreboard always shows one kept, one past its date and two upcoming.
+  const inDays = (n: number) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+  const pledges = [
+    ["Selemani", 5000, inDays(-3), "open"],
+    ["Agnes", 3000, inDays(4), "open"],
+    ["Musa", 10000, inDays(18), "open"],
+    ["Zawadi", 4000, inDays(-6), "fulfilled"],
+  ] as const;
+  for (const [name, cents, due, status] of pledges) {
     const u = await core.getOrCreateUser(`sim:2556${String(20000000 + cents)}`, "sim");
     await core.updateUser(u.id, { name });
-    await core.createPledge({ collection: col, user: u, displayName: name, amountCents: cents, dueDate: due });
+    const pl = await core.createPledge({ collection: col, user: u, displayName: name, amountCents: cents, dueDate: due });
+    if (status !== "open") await db.update(schema.pledges).set({ status }).where(eq(schema.pledges.id, pl.id));
   }
   const p = await core.proposePayout({ collection: col, requester: owner, recipientEmail: "mama.lishe@example.com", recipientName: "Mama Lishe Catering", amountCents: 30000, note: "catering deposit" });
   await db.update(schema.payouts).set({ status: "success", executedAt: new Date(), paypalBatchId: "DEMOBATCH", paypalItemId: "DEMOITEM" }).where(eq(schema.payouts.id, p.id));
