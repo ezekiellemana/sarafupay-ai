@@ -6,7 +6,7 @@
  * Shows who promised what as a friendly scoreboard rather than a collections report:
  * kept promises, what is still to come, who is overdue, and a "send friendly nudges"
  * button that reuses SarafuPay's WhatsApp reminder flow (with an inline confirm step).
- * Clicking a person cross-filters the rest of the dashboard.
+ * The nudge reaches everyone with an open pledge, so the widget never filters itself.
  */
 
 import { useEffect, useMemo, useState } from "react";
@@ -74,7 +74,6 @@ export function PledgeScoreboard(params: AgWidgetParams) {
   const options = (config?.options ?? {}) as ScoreboardOptions;
   const map = dataMapping as Partial<Record<Mapping, AgWidgetField[]>>;
   const [rows, setRows] = useState<Row[] | null>(null);
-  const [selected, setSelected] = useState<string | null>(null);
   const [nudge, setNudge] = useState<"idle" | "confirm" | "sending" | "done" | "error">("idle");
   const [nudgeMsg, setNudgeMsg] = useState("");
 
@@ -121,7 +120,9 @@ export function PledgeScoreboard(params: AgWidgetParams) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params]);
 
-  if (!rows) return null;
+  // Always render an element: Studio treats an empty widget as "not rendered yet"
+  // and, on a slow machine, never attaches it to the page.
+  if (!rows) return <div style={{ height: "100%" }} aria-busy="true" />;
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -135,15 +136,6 @@ export function PledgeScoreboard(params: AgWidgetParams) {
   const late = open.filter((r) => r.due && r.due.getTime() < today.getTime()).length;
   const waiting = rows.filter((r) => r.status === "open");
   const sorted = [...waiting].sort((a, b) => rank(a, today) - rank(b, today) || (a.due?.getTime() ?? 0) - (b.due?.getTime() ?? 0) || b.amount - a.amount);
-
-  const pick = (name: string) => {
-    const field = map.person?.[0];
-    if (!field) return;
-    const next = selected === name ? null : name;
-    setSelected(next);
-    if (next) widgetApi.toggleCrossFilter({ type: "value", field, value: name, group: 0, reset: true });
-    else widgetApi.resetCrossFilter();
-  };
 
   const sendNudges = async () => {
     if (!options.onNudge) return;
@@ -190,24 +182,19 @@ export function PledgeScoreboard(params: AgWidgetParams) {
         {kept.length > 0 && (
           <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 6 }} aria-label="Promises kept">
             {kept.map((r, i) => (
-              <button
+              <span
                 key={`kept-${r.person}-${i}`}
-                type="button"
-                onClick={() => pick(r.person)}
-                title={selected === r.person ? "Clear filter" : `Filter the dashboard to ${r.person}`}
                 style={{
-                  border: selected === r.person ? `1px solid ${FOREST}` : "1px solid transparent",
                   background: "#dff1e7",
                   color: "#0e5a3a",
                   borderRadius: 999,
                   padding: "2px 10px",
                   fontSize: 11,
                   fontWeight: 700,
-                  cursor: "pointer",
                 }}
               >
                 ✓ {r.person} · {fmt.format(r.amount)}
-              </button>
+              </span>
             ))}
           </div>
         )}
@@ -220,24 +207,16 @@ export function PledgeScoreboard(params: AgWidgetParams) {
         {sorted.map((r, i) => {
           const isKept = r.status === "fulfilled";
           const isLate = r.status === "open" && r.due && r.due.getTime() < today.getTime();
-          const active = selected === r.person;
           return (
             <li key={`${r.person}-${i}`}>
-              <button
-                type="button"
-                onClick={() => pick(r.person)}
-                title={active ? "Clear filter" : `Filter the dashboard to ${r.person}`}
+              <div
                 style={{
-                  all: "unset",
-                  boxSizing: "border-box",
                   display: "flex",
                   alignItems: "center",
                   gap: 10,
                   width: "100%",
                   padding: "6px 4px",
-                  cursor: "pointer",
                   borderBottom: `1px solid ${LINE}`,
-                  background: active ? "#fdf6e6" : "transparent",
                   opacity: r.status === "cancelled" ? 0.5 : 1,
                 }}
               >
@@ -279,7 +258,7 @@ export function PledgeScoreboard(params: AgWidgetParams) {
                     {isKept ? "Kept ✓" : r.status === "cancelled" ? "Cancelled" : "Open"}
                   </span>
                 </span>
-              </button>
+              </div>
             </li>
           );
         })}
