@@ -60,7 +60,7 @@ export default async function CollectionPage({ params, searchParams }: PageProps
             </div>
             <div className="mt-4"><Progress percent={stats.percent} /></div>
             <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
-              <div><p className="font-semibold">{stats.paidCount}</p><p className="text-ink-soft">contributions</p></div>
+              <div><p className="font-semibold">{stats.paidCount}</p><p className="text-ink-soft">{stats.paidCount === 1 ? "contribution" : "contributions"}</p></div>
               <div><p className="font-semibold">{money(stats.paidOutCents, col.currency)}</p><p className="text-ink-soft">paid out</p></div>
               <div><p className="font-semibold">{money(stats.availableCents, col.currency)}</p><p className="text-ink-soft">balance</p></div>
             </div>

@@ -31,7 +31,7 @@ export default async function Thanks({ params, searchParams }: PageProps<"/c/[co
           <div className="mt-6 text-left">
             <Progress percent={stats.percent} />
             <p className="mt-2 text-sm text-ink-soft">
-              {money(stats.raisedCents, col.currency)} of {money(col.targetCents, col.currency)} · {stats.paidCount} contributions
+              {money(stats.raisedCents, col.currency)} of {money(col.targetCents, col.currency)} · {stats.paidCount} {stats.paidCount === 1 ? "contribution" : "contributions"}
             </p>
           </div>
           <Link href={`/c/${col.code}`} className="btn btn-ghost mt-8">Back to the collection</Link>
