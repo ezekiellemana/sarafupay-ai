@@ -110,7 +110,16 @@ async function process(msg: Incoming): Promise<unknown> {
       lang: await langOf(msg.phone),
     });
     const messages = [...(await history(msg.phone)), current];
-    const run = (model: Parameters<typeof generateText>[0]["model"]) =>
+    const run = async (model: Parameters<typeof generateText>[0]["model"]) => {
+      try {
+        return await runOnce(model, true);
+      } catch (e) {
+        // A model that rejects the thinking setting still gets to answer, just without it.
+        if (/thinking/i.test(e instanceof Error ? e.message : String(e))) return runOnce(model, false);
+        throw e;
+      }
+    };
+    const runOnce = (model: Parameters<typeof generateText>[0]["model"], lowThinking: boolean) =>
       generateText({
         model,
         system,
@@ -119,6 +128,9 @@ async function process(msg: Incoming): Promise<unknown> {
         stopWhen: isStepCount(8),
         maxOutputTokens: 1200, // WhatsApp replies are short; caps cost per step
         maxRetries: 1,
+        // Chat replies should feel instant. Gemini 3 thinks at a higher level by default,
+        // and multi-tool turns (open collection -> pay link) took 15-20 s in a judge-style run.
+        ...(lowThinking ? { providerOptions: { google: { thinkingConfig: { thinkingLevel: "low" as const } } } } : {}),
       });
     const result = modelOverride ? await run(modelOverride) : await withGeminiFallback((m) => run(m));
     const reply = result.text.trim();
