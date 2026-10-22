@@ -178,6 +178,25 @@ async function main() {
   assert.ok(gp2.remindedAt, "remindedAt set once the template is delivered");
   console.log("✓ outside 24h: approved template delivers the reminder with a PayPal pay button");
 
+  // 4d. Same promise recorded twice (before and after the person gives their name) -> one pledge, one alert
+  const BARAKA = "sim:255700000505";
+  const baraka = await core.getOrCreateUser(BARAKA, "sim");
+  const before = (await inbox(OWNER)).filter((m) => m.includes("$20.00")).length;
+  await core.createPledge({ collection: col, user: baraka, displayName: "Anonymous", amountCents: 2000, dueDate: "2026-11-06" });
+  await core.createPledge({ collection: col, user: baraka, displayName: "Baraka", amountCents: 2000, dueDate: "2026-11-06" });
+  const bp = await db.select().from(schema.pledges).where(eq(schema.pledges.userId, baraka.id));
+  assert.equal(bp.length, 1, "repeat of the same promise does not create a second pledge");
+  assert.equal(bp[0].displayName, "Baraka", "repeat carries the name onto the existing pledge");
+  assert.equal((await inbox(OWNER)).filter((m) => m.includes("$20.00")).length - before, 1, "organiser alerted once");
+  // Giving a name later (update_my_profile) renames that person's anonymous open pledges
+  const ZURI = "sim:255700000606";
+  const zuri = await core.getOrCreateUser(ZURI, "sim");
+  await core.createPledge({ collection: col, user: zuri, displayName: "Anonymous", amountCents: 2500 });
+  await core.updateUser(zuri.id, { name: "Zuri" });
+  const [zp] = await db.select().from(schema.pledges).where(eq(schema.pledges.userId, zuri.id));
+  assert.equal(zp.displayName, "Zuri", "anonymous pledge takes the name given later");
+  console.log("✓ a repeated pledge updates instead of duplicating; late names replace 'Anonymous'");
+
   // 5. Non-owner cannot pay out
   script.push({ tool: ["prepare_payout", { code: col.code, recipient_email: "x@example.com", amount: 10, purpose: "test" }] }, { text: "Sorry" });
   await say(JOHN, "pay me $10");

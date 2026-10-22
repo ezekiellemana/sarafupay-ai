@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, sql } from "drizzle-orm";
 import { getDb, schema } from "../db";
 import type { Collection, Contribution, Payout, User } from "../db/schema";
 import { money, newId, pct, progressBar, randomDigits, slugCode } from "../format";
@@ -39,6 +39,17 @@ export async function getUser(id: string): Promise<User | undefined> {
 export async function updateUser(id: string, patch: Partial<Pick<User, "name" | "paypalEmail" | "activeCollectionId">>) {
   const db = await getDb();
   const [u] = await db.update(users).set(patch).where(eq(users.id, id)).returning();
+  if (patch.name) {
+    // Someone who pledged or started paying before telling us their name shows up by name from now on.
+    await db
+      .update(pledges)
+      .set({ displayName: patch.name })
+      .where(and(eq(pledges.userId, id), eq(pledges.status, "open"), eq(pledges.displayName, "Anonymous")));
+    await db
+      .update(contributions)
+      .set({ displayName: patch.name })
+      .where(and(eq(contributions.contributorId, id), eq(contributions.status, "pending"), eq(contributions.displayName, "Anonymous")));
+  }
   return u;
 }
 
@@ -384,6 +395,10 @@ async function onContributionPaid(ctb: Contribution) {
 
 // ---------- pledges ----------
 
+const ANON = "Anonymous";
+/** A repeat of the same promise (same person, collection and amount) within this window updates it instead. */
+const PLEDGE_DEDUP_MS = 30 * 60_000;
+
 export async function createPledge(input: {
   collection: Collection;
   user: User;
@@ -392,6 +407,30 @@ export async function createPledge(input: {
   dueDate?: string;
 }) {
   const db = await getDb();
+  // The model sometimes records the same promise twice, e.g. once before and once after the
+  // person tells us their name. Treat that as an update, and never notify the organiser twice.
+  const [dup] = await db
+    .select()
+    .from(pledges)
+    .where(
+      and(
+        eq(pledges.collectionId, input.collection.id),
+        eq(pledges.userId, input.user.id),
+        eq(pledges.amountCents, input.amountCents),
+        eq(pledges.status, "open"),
+        gt(pledges.createdAt, new Date(Date.now() - PLEDGE_DEDUP_MS)),
+      ),
+    )
+    .orderBy(desc(pledges.createdAt))
+    .limit(1);
+  if (dup) {
+    const patch: Partial<typeof pledges.$inferInsert> = {};
+    if (input.displayName && input.displayName !== ANON && input.displayName !== dup.displayName) patch.displayName = input.displayName;
+    if (input.dueDate && input.dueDate !== dup.dueDate) patch.dueDate = input.dueDate;
+    if (!Object.keys(patch).length) return dup;
+    const [u] = await db.update(pledges).set(patch).where(eq(pledges.id, dup.id)).returning();
+    return u!;
+  }
   const [p] = await db
     .insert(pledges)
     .values({
