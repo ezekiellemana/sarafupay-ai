@@ -100,8 +100,39 @@ export const processedMessages = pgTable("processed_messages", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// PayPal webhook events, one row per delivery id. A short log of what PayPal told us about each
+// payment, so the organiser copilot can explain a payment's history ("why is Juma's payment pending?").
+export const paymentEvents = pgTable(
+  "payment_events",
+  {
+    id: text("id").primaryKey(), // PayPal event id
+    kind: text("kind").notNull(), // CHECKOUT.ORDER.APPROVED, PAYMENT.CAPTURE.COMPLETED, ...
+    contributionId: text("contribution_id"),
+    orderId: text("order_id"),
+    status: text("status"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("payment_events_ctb_idx").on(t.contributionId), index("payment_events_order_idx").on(t.orderId)],
+);
+
+// Reminders the organiser copilot drafted. Nothing is sent until the organiser approves the draft.
+export const reminderDrafts = pgTable("reminder_drafts", {
+  id: text("id").primaryKey(),
+  collectionId: text("collection_id").notNull(),
+  createdBy: text("created_by").notNull(), // organiser's user id
+  userId: text("user_id").notNull(), // who gets the reminder
+  pledgeId: text("pledge_id"),
+  displayName: text("display_name").notNull(),
+  amountCents: integer("amount_cents").notNull(),
+  text: text("text").notNull(),
+  status: text("status").notNull().default("draft"), // draft | sent | unreachable
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+});
+
 export type User = typeof users.$inferSelect;
 export type Collection = typeof collections.$inferSelect;
 export type Contribution = typeof contributions.$inferSelect;
 export type Pledge = typeof pledges.$inferSelect;
 export type Payout = typeof payouts.$inferSelect;
+export type ReminderDraft = typeof reminderDrafts.$inferSelect;

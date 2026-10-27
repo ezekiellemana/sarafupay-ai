@@ -84,4 +84,27 @@ CREATE TABLE IF NOT EXISTS processed_messages (
   id text PRIMARY KEY,
   created_at timestamptz NOT NULL DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS payment_events (
+  id text PRIMARY KEY,
+  kind text NOT NULL,
+  contribution_id text,
+  order_id text,
+  status text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS payment_events_ctb_idx ON payment_events (contribution_id);
+CREATE INDEX IF NOT EXISTS payment_events_order_idx ON payment_events (order_id);
+CREATE TABLE IF NOT EXISTS reminder_drafts (
+  id text PRIMARY KEY,
+  collection_id text NOT NULL,
+  created_by text NOT NULL,
+  user_id text NOT NULL,
+  pledge_id text,
+  display_name text NOT NULL,
+  amount_cents integer NOT NULL,
+  text text NOT NULL,
+  status text NOT NULL DEFAULT 'draft',
+  created_at timestamptz NOT NULL DEFAULT now(),
+  sent_at timestamptz
+);
 `;
