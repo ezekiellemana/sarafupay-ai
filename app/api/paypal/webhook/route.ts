@@ -1,8 +1,8 @@
 import { after, NextResponse } from "next/server";
 import { verifyPaypalWebhook } from "@/lib/paypal/webhooks";
-import { applyCapture, refreshPayout, settleOrder, settlePledgeInvoice } from "@/lib/services/core";
+import { applyCapture, recordPaymentEvent, refreshPayout, settleOrder, settlePledgeInvoice } from "@/lib/services/core";
 
-type Event = { event_type: string; resource: Record<string, any> }; // eslint-disable-line @typescript-eslint/no-explicit-any
+type Event = { id?: string; event_type: string; resource: Record<string, any> }; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 export async function POST(req: Request) {
   const raw = await req.text();
@@ -15,6 +15,17 @@ export async function POST(req: Request) {
   if (!ok) return new Response("unverified", { status: 401 });
   const evt = JSON.parse(raw) as Event;
   const r = evt.resource ?? {};
+  // Keep what PayPal said about each payment, for the organiser copilot. Handlers below are
+  // idempotent, so a repeated delivery is still processed.
+  if (evt.id && /^(CHECKOUT\.ORDER|PAYMENT\.CAPTURE)\./.test(evt.event_type)) {
+    await recordPaymentEvent({
+      id: evt.id,
+      kind: evt.event_type,
+      contributionId: r.custom_id ?? r.purchase_units?.[0]?.custom_id,
+      orderId: evt.event_type.startsWith("CHECKOUT.ORDER") ? r.id : r.supplementary_data?.related_ids?.order_id,
+      status: r.status,
+    });
+  }
   after(async () => {
     try {
       switch (evt.event_type) {
