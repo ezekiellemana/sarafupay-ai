@@ -354,6 +354,46 @@ async function main() {
     console.log("✓ organiser copilot: diagnoses each person, recovers a lost webhook, sends drafts only after a yes, once");
   }
 
+  // 12. A hanging model call times out and the next Gemini model answers, unless a tool already ran
+  {
+    const { generateText } = await import("ai");
+    const { isRetryableModelError, withGeminiFallback } = await import("../lib/agent/models");
+    const slow = new MockLanguageModelV4({
+      doGenerate: async ({ abortSignal }) => {
+        await new Promise((r, reject) => {
+          const timer = setTimeout(r, 5_000);
+          abortSignal?.addEventListener("abort", () => (clearTimeout(timer), reject(abortSignal.reason)));
+        });
+        return { content: [{ type: "text", text: "late" }], finishReason: { unified: "stop", raw: "stop" }, usage, warnings: [] };
+      },
+    });
+    let timeoutError: unknown;
+    try {
+      await generateText({ model: slow, prompt: "hi", maxRetries: 0, timeout: { stepMs: 50 } });
+    } catch (e) {
+      timeoutError = e;
+    }
+    assert.ok(timeoutError, "step timeout aborts the call");
+    assert.ok(isRetryableModelError(timeoutError), "a timed-out call moves on to the next model");
+    const tried: string[] = [];
+    const answer = await withGeminiFallback(async (_m, id) => {
+      tried.push(id);
+      if (tried.length === 1) throw timeoutError;
+      return "ok";
+    });
+    assert.equal(answer, "ok");
+    assert.equal(tried.length, 2, "second model answered after the first timed out");
+    let calls = 0;
+    await assert.rejects(
+      withGeminiFallback(async () => {
+        calls++;
+        throw timeoutError;
+      }, () => false),
+    );
+    assert.equal(calls, 1, "no retry once a tool has run");
+    console.log("✓ a hanging model call times out; the next model answers unless a tool already ran");
+  }
+
   // 10. Cost guard without Key Value falls back to memory and still limits.
   const limits = await import("../lib/limits");
   for (let i = 0; i < 3; i++) assert.equal(await limits.hit("test-ip", 3, 60_000), true);
