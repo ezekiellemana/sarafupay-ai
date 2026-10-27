@@ -301,6 +301,59 @@ async function main() {
   assert.equal(after2.find((c) => c.id === flaky.id)?.status, "pending", "transient error: retried next run");
   console.log("✓ reconcile closes expired orders and treats PayPal hiccups as warnings");
 
+  // 11. Organiser copilot: who hasn't paid and why, reminder drafts sent only after a yes
+  {
+    const inv = await import("../lib/services/investigate");
+    const owner = await core.getOrCreateUser(OWNER, "sim", "Enzo");
+    const fund = await core.createCollection({ ownerId: owner.id, title: "Hospital Bill", targetCents: 100000 });
+    const peter = await core.getOrCreateUser("sim:255700000707", "sim", "Peter");
+    const rose = await core.getOrCreateUser("sim:255700000808", "sim", "Rose");
+    const musa = await core.getOrCreateUser("sim:255700000909", "sim", "Musa");
+    await core.createPledge({ collection: fund, user: peter, displayName: "Peter", amountCents: 3000, dueDate: "2026-11-01" });
+    const roseCtb = await core.createContribution({ collection: fund, contributorId: rose.id, displayName: "Rose", amountCents: 2000, source: "sim" });
+    const musaCtb = await core.createContribution({ collection: fund, contributorId: musa.id, displayName: "Musa", amountCents: 5000, source: "sim" });
+    await db.update(schema.contributions).set({ paypalOrderId: "ORDER-ROSE" }).where(eq(schema.contributions.id, roseCtb.id));
+    await db.update(schema.contributions).set({ paypalOrderId: "ORDER-MUSA" }).where(eq(schema.contributions.id, musaCtb.id));
+    await core.recordPaymentEvent({ id: "WH-1", kind: "CHECKOUT.ORDER.CREATED", contributionId: roseCtb.id, orderId: "ORDER-ROSE", status: "CREATED" });
+    await core.recordPaymentEvent({ id: "WH-1", kind: "CHECKOUT.ORDER.CREATED", contributionId: roseCtb.id, orderId: "ORDER-ROSE", status: "CREATED" }); // redelivery
+    inv.__setInvestigateDepsForTests({
+      paypalOrder: async (id: string) =>
+        id === "ORDER-MUSA"
+          ? { status: "COMPLETED", captureId: "CAP-MUSA", customId: musaCtb.id, payerEmail: "musa@example.com" }
+          : { status: "PAYER_ACTION_REQUIRED", customId: roseCtb.id },
+    });
+
+    script.push({ tool: ["investigate_payments", { code: fund.code }] }, { text: "Here is who hasn't paid" });
+    await say(OWNER, "Who hasn't paid for the hospital bill?");
+    const rep = await inv.investigate(fund, owner); // what the tool returned, read back the same way
+    const byPerson = Object.fromEntries(rep.cases.map((c) => [c.name, c]));
+    assert.equal(byPerson.Peter?.diagnosis, "pledged_not_started");
+    assert.equal(byPerson.Rose?.diagnosis, "waiting_on_payer");
+    assert.ok(byPerson.Rose!.timeline.some((e) => e.what.includes("CHECKOUT.ORDER.CREATED")), "webhook log shows in the timeline");
+    assert.equal(byPerson.Musa, undefined, "Musa no longer owes after the first run recovered his payment");
+    const musaRow = (await db.select().from(schema.contributions).where(eq(schema.contributions.id, musaCtb.id)))[0];
+    assert.equal(musaRow.status, "paid", "lost webhook recovered by the live PayPal check");
+    assert.equal((await inbox(musa.phone)).filter((m) => /Payment received|Malipo yamepokelewa/.test(m)).length, 1, "Musa gets one receipt");
+    assert.ok(!(await inbox(peter.phone)).some((m) => m.includes("Hospital Bill")), "nothing sent before the organiser says yes");
+    const one = await inv.investigate(fund, owner, "rose");
+    assert.equal(one.cases.length, 1);
+    assert.equal(one.cases[0].name, "Rose", "name search finds one person");
+    assert.equal((await inv.investigate(fund, owner, "Zawadi")).cases[0].diagnosis, "not_found");
+
+    const drafts = [byPerson.Peter!.draft!.id, (await inv.investigate(fund, owner, "rose")).cases[0].draft!.id];
+    script.push({ tool: ["send_reminder_drafts", { code: fund.code, draft_ids: drafts }] }, { text: "Sent" });
+    await say(OWNER, "Yes, send them");
+    assert.ok((await inbox(peter.phone)).some((m) => m.includes("Hospital Bill") && m.includes("/pay/ctb_")), "Peter reminded with a fresh pay link");
+    assert.ok((await inbox(rose.phone)).some((m) => /started paying|ulianza kulipa/.test(m) && m.includes("/pay/ctb_")), "Rose gets the 'finish paying' wording");
+    const again = await inv.sendReminderDrafts(fund, drafts);
+    assert.deepEqual(again.sent, [], "a second yes can't send the same drafts twice");
+    assert.equal(again.not_found.length, 2);
+    const stranger = await core.getOrCreateUser("sim:255700000111", "sim", "Stranger");
+    script.push({ tool: ["investigate_payments", { code: fund.code }] }, { text: "Only the owner can do that" });
+    await say(stranger.phone, `Who hasn't paid ${fund.code}?`);
+    console.log("✓ organiser copilot: diagnoses each person, recovers a lost webhook, sends drafts only after a yes, once");
+  }
+
   // 10. Cost guard without Key Value falls back to memory and still limits.
   const limits = await import("../lib/limits");
   for (let i = 0; i < 3; i++) assert.equal(await limits.hit("test-ip", 3, 60_000), true);

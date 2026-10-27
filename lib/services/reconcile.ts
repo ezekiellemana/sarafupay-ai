@@ -5,7 +5,7 @@ import { getDb, schema } from "../db";
 import { getOrderSummary } from "../paypal/orders";
 import { applyCapture, refreshPayout, settleOrder } from "./core";
 
-const { contributions, payouts, processedMessages } = schema;
+const { contributions, payouts, processedMessages, paymentEvents } = schema;
 
 /**
  * Safety net run by the Render Cron Job (`sarafupay-reconcile`, every 15 minutes).
@@ -18,7 +18,7 @@ const { contributions, payouts, processedMessages } = schema;
  *    - COMPLETED at PayPal  -> record it (receipt + organiser alert go out once).
  *    - APPROVED but never captured -> capture it, exactly what the return URL would do.
  * 2. Payouts stuck in "processing" -> pull the batch status and finalise.
- * 3. Prune WhatsApp de-duplication rows older than 7 days.
+ * 3. Prune WhatsApp de-duplication rows older than 7 days and PayPal event logs older than 90.
  *
  * Every step reuses the same idempotent functions as the webhooks, so a job that
  * overlaps a late webhook can never double-count money or double-notify.
@@ -149,7 +149,12 @@ export async function reconcile(deps: ReconcileDeps = realDeps): Promise<Reconci
     .delete(processedMessages)
     .where(lt(processedMessages.createdAt, new Date(now - 7 * 24 * 60 * 60_000)))
     .returning({ id: processedMessages.id });
-  report.prunedDedupRows = pruned.length;
+  // The PayPal event log is the history the organiser copilot explains, so it stays longer.
+  const prunedEvents = await db
+    .delete(paymentEvents)
+    .where(lt(paymentEvents.createdAt, new Date(now - 90 * 24 * 60 * 60_000)))
+    .returning({ id: paymentEvents.id });
+  report.prunedDedupRows = pruned.length + prunedEvents.length;
 
   return report;
 
