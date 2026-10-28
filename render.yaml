@@ -43,6 +43,9 @@ services:
           property: connectionString
       - key: CRON_SECRET
         generateValue: true
+      # Signs evidence cards (Render generates a base64 256-bit value: exactly an Ed25519 seed).
+      - key: EVIDENCE_SIGNING_KEY
+        generateValue: true
       - key: ENABLE_SIMULATOR
         value: "true"
       - key: DAILY_AI_LIMIT
