@@ -88,7 +88,7 @@ Full deployment diagram: [Architecture on Render](#architecture-on-render).
 - **Verified webhooks.** PayPal and Meta signatures are checked; duplicate WhatsApp deliveries are ignored so nobody gets double replies.
 - **Reminders outside 24 hours.** Pledge reminders use an approved WhatsApp template (`pledge_reminder`, with a PayPal pay button) when available; otherwise the organiser gets the person's pay link to forward.
 - **Sandbox pinned.** The Agent Toolkit is forced to `sandbox: true`.
-- **Resilient AI.** If a Gemini model is overloaded, rate-limited or takes over 20 s on a step, that step moves to the next model (`gemini-3.8-flash` → `3.6-flash` → `3.5-flash-lite` → `3.5-flash`). Tools run between steps, so the switch never repeats an action that already happened.
+- **Resilient AI.** If a Gemini model is overloaded, rate-limited or takes over 15 s on a step, that step (and the rest of that reply) moves to the next model (`gemini-3.8-flash` → `3.6-flash` → `3.5-flash-lite` → `3.5-flash`). Tools run between steps, so the switch never repeats an action that already happened.
 
 ### Built with the APIMatic Context Plugin
 

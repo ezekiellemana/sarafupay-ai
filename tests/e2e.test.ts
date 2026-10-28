@@ -421,10 +421,17 @@ async function main() {
     assert.equal(result.text, "Created ✅", "the next model finished the turn");
     assert.equal(created, 1, "the tool ran once, not again on the next model");
     assert.equal(backup.doGenerateCalls.length, 1, "only the hung step moved to the next model");
+    assert.equal(primaryCalls, 2, "the primary got the first step and the hung one");
     assert.ok(backup.doGenerateCalls[0]!.prompt.some((m) => m.role === "tool"), "the next model saw the tool's result");
+    const hang = new MockLanguageModelV4({ doGenerate: ({ abortSignal }) => new Promise((_r, reject) => abortSignal?.addEventListener("abort", () => reject(abortSignal.reason))) });
+    const call = { ...backup.doGenerateCalls[0]!, abortSignal: undefined };
+    const sticky = geminiChain(50, [hang, backup]);
+    await sticky.doGenerate(call);
+    await sticky.doGenerate(call);
+    assert.equal(hang.doGenerateCalls.length, 1, "a model that hung is skipped for the rest of the reply");
     const failing = new MockLanguageModelV4({ doGenerate: async () => { throw new Error("invalid argument"); } });
-    await assert.rejects(async () => geminiChain(50, [failing, backup]).doGenerate(backup.doGenerateCalls[0]!), /invalid argument/);
-    assert.equal(backup.doGenerateCalls.length, 1, "a non-retryable error doesn't fall back");
+    await assert.rejects(async () => geminiChain(50, [failing, backup]).doGenerate(call), /invalid argument/);
+    assert.equal(backup.doGenerateCalls.length, 3, "a non-retryable error doesn't fall back");
     assert.ok(isRetryableModelError(new DOMException("The operation was aborted due to timeout", "TimeoutError")));
     console.log("✓ a hanging step moves to the next Gemini model, without repeating tools that already ran");
   }
