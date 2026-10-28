@@ -40,6 +40,7 @@ Across East Africa and the diaspora, money for weddings, funerals, hospital bill
 | **Organiser** | "Tuna kiasi gani?" / "Who has paid?" | AI answers from live data |
 | **Organiser** | "Who hasn't paid?" / "Why is Rose's payment pending?" | **Organiser copilot**: walks each person's pledges, pay links and the PayPal webhook log, asks PayPal for the live status of any pending order (recording a payment whose webhook was lost), explains each case in a sentence, and drafts reminders in the payer's language. Nothing is sent until the organiser says yes; each draft goes once, with a fresh PayPal pay link |
 | **Organiser** | "Pay Mama Lishe $300 for catering" | AI prepares a **PayPal Payout**; money moves **only** after the organiser replies `CONFIRM <6-digit code>`, a step the LLM never touches |
+| **Everyone** | Receipt or transparency update → **Signed proof** link | Every PayPal capture and payout is signed into the collection's **tamper-evident evidence chain** (Ed25519, hash-chained): who, how much, PayPal references, who authorised it and the totals right after. `/proof/<id>` shows the card and verifies the signature **in the visitor's own browser**; editing or deleting an earlier card breaks the chain for everyone to see |
 | **Everyone** | – | Every payout is broadcast to contributors as a **transparency update** and listed on the public page `/c/CODE`, next to a searchable, paginated supporters list (first names and messages only) |
 | **Anyone with the link** | Public page `/c/CODE` | Chip in on the web: one currency-aware amount field with live formatting and quick picks, then PayPal checkout |
 | **Treasurer** | Private dashboard `/d/CODE` | **AG Studio** dashboard (KPIs, charts, contribution and payout ledgers), a custom **Pledge scoreboard** widget, and a custom **Treasurer agent** that delegates to Studio's built-in agents |
@@ -164,7 +165,7 @@ Design notes:
 3. Switch to **Friend · Amina** → `Contribute <CODE>` → `$20` → open the link → pay with the sandbox buyer shown in the simulator.
 4. Back as Organiser: see the alert, ask `who has paid?`; switch to **Friend · John**, pledge `I'll pay $10 to <CODE> on Friday`, then as Organiser ask `who hasn't paid?` to see the copilot's diagnosis and reminder draft (reply `yes` to send it). Then ask for a payout to the sandbox account shown in the simulator's help panel (e.g. `pay <that email> $5 for the deposit`) and reply with the `CONFIRM` code. Sandbox payouts only succeed to real sandbox accounts; a made-up email ends unclaimed.
 5. Watch the transparency update arrive for Amina, then ask for the **dashboard link** to open the AG Studio treasurer dashboard.
-6. Open the public page `/c/<CODE>`: the payout ledger, the supporters list (search by name) and the web checkout.
+6. Open the public page `/c/<CODE>`: the payout ledger, the supporters list (search by name) and the web checkout. Tap **proof** next to a payout or supporter, then **Verify in my browser** to check the Ed25519 signature yourself.
 
 Your simulator session is private to your browser. Use **Start fresh** in the simulator's help panel to reset it.
 
@@ -174,7 +175,7 @@ Try it in Swahili too: `Habari, nataka kuanzisha mchango wa msiba, lengo $200`.
 
 `npm test` runs the whole money flow end to end with a scripted LLM, in-memory Postgres and a stubbed PayPal API:
 
-collection created · language follows the share card, then the user's own words · private simulator sessions · payment link · capture settled once (idempotent) with receipt + organiser alert · Swahili receipt for a Tanzanian contributor · supporters search (no email leaks) · pledge + reminder · refused WhatsApp reminder not marked as sent · non-owner payout blocked · over-balance payout blocked · payout executed once by CONFIRM code (wrong code and replay rejected) · transparency broadcast · privacy for non-owners · reminder template outside the 24-hour window · Render Cron Job recovers lost-webhook payments exactly once · organiser copilot diagnoses who hasn't paid, recovers a lost webhook live, and sends reminder drafts only after a yes, once · cost guard falls back to memory when Key Value is down.
+collection created · language follows the share card, then the user's own words · private simulator sessions · payment link · capture settled once (idempotent) with receipt + organiser alert · Swahili receipt for a Tanzanian contributor · supporters search (no email leaks) · pledge + reminder · refused WhatsApp reminder not marked as sent · non-owner payout blocked · over-balance payout blocked · payout executed once by CONFIRM code (wrong code and replay rejected) · transparency broadcast · privacy for non-owners · reminder template outside the 24-hour window · Render Cron Job recovers lost-webhook payments exactly once · evidence chain signs every capture and payout, verifies with WebCrypto from public data only, and detects edited or deleted cards · organiser copilot diagnoses who hasn't paid, recovers a lost webhook live, and sends reminder drafts only after a yes, once · cost guard falls back to memory when Key Value is down.
 
 ## Built with
 
