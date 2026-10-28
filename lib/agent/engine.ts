@@ -128,7 +128,7 @@ async function process(msg: Incoming): Promise<unknown> {
         stopWhen: isStepCount(8),
         maxOutputTokens: 1200, // WhatsApp replies are short; caps cost per step
         maxRetries: 1,
-        // A model call that hangs must not hold the chat: geminiChain gives each call 20 s before
+        // A model call that hangs must not hold the chat: geminiChain gives each call 15 s before
         // the next Gemini model takes that step (one reply took over 2 minutes on the live demo).
         timeout: { totalMs: 90_000 },
         // Chat replies should feel instant. Gemini 3 thinks at a higher level by default,
