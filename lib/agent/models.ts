@@ -39,10 +39,13 @@ type ChainModel = Pick<GeminiModel, "specificationVersion" | "provider" | "model
  * Tools run between steps, never inside a call, so trying a step again on the next model can't
  * repeat a tool. That keeps a hang after a tool has run (a collection created, a reminder sent)
  * from ending in an apology: the next model just carries on from the tool's result.
+ * Make one chain per reply: a model that failed is skipped for the rest of that reply, so a
+ * hanging model costs one timeout, not one per step.
  */
-export function geminiChain(callMs = 20_000, models?: ChainModel[]): ChainModel {
+export function geminiChain(callMs = 15_000, models?: ChainModel[]): ChainModel {
   const chain = models ?? env.geminiModels().map((id) => createGoogleGenerativeAI({ apiKey: env.geminiApiKey() })(id));
   const first = chain[0]!;
+  let start = 0;
   return {
     specificationVersion: first.specificationVersion,
     provider: first.provider,
@@ -50,7 +53,8 @@ export function geminiChain(callMs = 20_000, models?: ChainModel[]): ChainModel 
     supportedUrls: first.supportedUrls,
     async doGenerate(options) {
       let last: unknown;
-      for (const model of chain) {
+      for (let i = start; i < chain.length; i++) {
+        const model = chain[i]!;
         const signal = options.abortSignal ? AbortSignal.any([options.abortSignal, AbortSignal.timeout(callMs)]) : AbortSignal.timeout(callMs);
         try {
           return await model.doGenerate({ ...options, abortSignal: signal });
@@ -59,6 +63,7 @@ export function geminiChain(callMs = 20_000, models?: ChainModel[]): ChainModel 
           // The caller gave up (overall timeout): stop rather than start another model.
           if (options.abortSignal?.aborted || !isRetryableModelError(e)) throw e;
           console.warn(`[gemini] ${model.modelId} failed on a step, trying next model`);
+          if (i + 1 < chain.length) start = i + 1;
         }
       }
       throw last;
