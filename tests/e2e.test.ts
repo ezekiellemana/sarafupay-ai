@@ -390,44 +390,43 @@ async function main() {
     console.log("✓ organiser copilot: diagnoses each person, recovers a lost webhook, sends drafts only after a yes, once");
   }
 
-  // 12. A hanging model call times out and the next Gemini model answers, unless a tool already ran
+  // 12. A hanging model call times out and the next Gemini model takes that step, even after a tool ran
   {
-    const { generateText } = await import("ai");
-    const { isRetryableModelError, withGeminiFallback } = await import("../lib/agent/models");
-    const slow = new MockLanguageModelV4({
+    const { generateText, isStepCount, tool } = await import("ai");
+    const { z } = await import("zod");
+    const { geminiChain, isRetryableModelError } = await import("../lib/agent/models");
+    const done = { finishReason: { unified: "stop" as const, raw: "stop" }, usage, warnings: [] };
+    let primaryCalls = 0;
+    const primary = new MockLanguageModelV4({
       doGenerate: async ({ abortSignal }) => {
+        primaryCalls++;
+        // First step: ask for the tool. Second step (after the tool ran): hang.
+        if (primaryCalls === 1) return { ...done, finishReason: { unified: "tool-calls", raw: "tool-calls" }, content: [{ type: "tool-call", toolCallId: "c1", toolName: "create", input: "{}" }] };
         await new Promise((r, reject) => {
           const timer = setTimeout(r, 5_000);
           abortSignal?.addEventListener("abort", () => (clearTimeout(timer), reject(abortSignal.reason)));
         });
-        return { content: [{ type: "text", text: "late" }], finishReason: { unified: "stop", raw: "stop" }, usage, warnings: [] };
+        return { ...done, content: [{ type: "text", text: "late" }] };
       },
     });
-    let timeoutError: unknown;
-    try {
-      await generateText({ model: slow, prompt: "hi", maxRetries: 0, timeout: { stepMs: 50 } });
-    } catch (e) {
-      timeoutError = e;
-    }
-    assert.ok(timeoutError, "step timeout aborts the call");
-    assert.ok(isRetryableModelError(timeoutError), "a timed-out call moves on to the next model");
-    const tried: string[] = [];
-    const answer = await withGeminiFallback(async (_m, id) => {
-      tried.push(id);
-      if (tried.length === 1) throw timeoutError;
-      return "ok";
+    const backup = new MockLanguageModelV4({ doGenerate: async () => ({ ...done, content: [{ type: "text", text: "Created ✅" }] }) });
+    let created = 0;
+    const result = await generateText({
+      model: geminiChain(50, [primary, backup]),
+      prompt: "make it",
+      tools: { create: tool({ inputSchema: z.object({}), execute: async () => (created++, { ok: true }) }) },
+      stopWhen: isStepCount(4),
+      maxRetries: 0,
     });
-    assert.equal(answer, "ok");
-    assert.equal(tried.length, 2, "second model answered after the first timed out");
-    let calls = 0;
-    await assert.rejects(
-      withGeminiFallback(async () => {
-        calls++;
-        throw timeoutError;
-      }, () => false),
-    );
-    assert.equal(calls, 1, "no retry once a tool has run");
-    console.log("✓ a hanging model call times out; the next model answers unless a tool already ran");
+    assert.equal(result.text, "Created ✅", "the next model finished the turn");
+    assert.equal(created, 1, "the tool ran once, not again on the next model");
+    assert.equal(backup.doGenerateCalls.length, 1, "only the hung step moved to the next model");
+    assert.ok(backup.doGenerateCalls[0]!.prompt.some((m) => m.role === "tool"), "the next model saw the tool's result");
+    const failing = new MockLanguageModelV4({ doGenerate: async () => { throw new Error("invalid argument"); } });
+    await assert.rejects(async () => geminiChain(50, [failing, backup]).doGenerate(backup.doGenerateCalls[0]!), /invalid argument/);
+    assert.equal(backup.doGenerateCalls.length, 1, "a non-retryable error doesn't fall back");
+    assert.ok(isRetryableModelError(new DOMException("The operation was aborted due to timeout", "TimeoutError")));
+    console.log("✓ a hanging step moves to the next Gemini model, without repeating tools that already ran");
   }
 
   // 10. Cost guard without Key Value falls back to memory and still limits.

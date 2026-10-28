@@ -7,7 +7,7 @@ import { logInbound, sendTo } from "../channels/messaging";
 import * as core from "../services/core";
 import { buildTools } from "./tools";
 import { systemPrompt } from "./prompt";
-import { withGeminiFallback } from "./models";
+import { geminiChain } from "./models";
 import { langOf, t } from "../i18n";
 import { takeAiCall } from "../limits";
 
@@ -110,15 +110,6 @@ async function process(msg: Incoming): Promise<unknown> {
       lang: await langOf(msg.phone),
     });
     const messages = [...(await history(msg.phone)), current];
-    // Track whether any tool ran: after that, starting over on another model could repeat it
-    // (a second collection, a second reminder), so a failure then gets the apology instead.
-    let toolsRan = false;
-    const tools = Object.fromEntries(
-      Object.entries(buildTools(ctx)).map(([name, tl]) => [
-        name,
-        tl.execute ? { ...tl, execute: (...args: Parameters<NonNullable<typeof tl.execute>>) => ((toolsRan = true), tl.execute!(...args)) } : tl,
-      ]),
-    ) as ReturnType<typeof buildTools>;
     const run = async (model: Parameters<typeof generateText>[0]["model"]) => {
       try {
         return await runOnce(model, true);
@@ -133,18 +124,18 @@ async function process(msg: Incoming): Promise<unknown> {
         model,
         system,
         messages,
-        tools,
+        tools: buildTools(ctx),
         stopWhen: isStepCount(8),
         maxOutputTokens: 1200, // WhatsApp replies are short; caps cost per step
         maxRetries: 1,
-        // A model call that hangs must not hold the chat: give up on a step after 25 s and
-        // let the next Gemini model answer (one reply took over 2 minutes on the live demo).
-        timeout: { stepMs: 25_000, totalMs: 90_000 },
+        // A model call that hangs must not hold the chat: geminiChain gives each call 20 s before
+        // the next Gemini model takes that step (one reply took over 2 minutes on the live demo).
+        timeout: { totalMs: 90_000 },
         // Chat replies should feel instant. Gemini 3 thinks at a higher level by default,
         // and multi-tool turns (open collection -> pay link) took 15-20 s in a judge-style run.
         ...(lowThinking ? { providerOptions: { google: { thinkingConfig: { thinkingLevel: "low" as const } } } } : {}),
       });
-    const result = modelOverride ? await run(modelOverride) : await withGeminiFallback((m) => run(m), () => !toolsRan);
+    const result = await run(modelOverride ?? geminiChain());
     const reply = result.text.trim();
     if (reply) await sendTo(msg.phone, reply);
   } catch (e) {
