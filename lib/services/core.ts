@@ -10,6 +10,7 @@ import { captureOrder, createContributionOrder } from "../paypal/orders";
 import { getPayoutBatch, sendPayout } from "../paypal/payouts";
 import { dashboardUrl, payUrl } from "./links";
 import { langOf, t, type Lang } from "../i18n";
+import { appendCard, proofUrl, type EvidenceBody } from "./evidence";
 
 const { users, collections, contributions, pledges, payouts } = schema;
 
@@ -241,6 +242,12 @@ export async function searchSupporters(
 }
 
 /** "Mary (London)" → "Mary", "baraka's uncle" → "Baraka's". Public pages show first names only. */
+/** "mama.lishe@example.com" -> "ma•••@example.com": enough to recognise, not enough to reuse. */
+export function maskEmail(email: string): string {
+  const [user, domain] = email.split("@");
+  return domain ? `${(user ?? "").slice(0, 2)}•••@${domain}` : "recipient";
+}
+
 export function firstName(name: string): string {
   const w = name.trim().split(/\s+/)[0] ?? "";
   return w ? w[0].toUpperCase() + w.slice(1) : "Anonymous";
@@ -354,6 +361,28 @@ export async function recordPaymentEvent(e: { id: string; kind: string; contribu
     .onConflictDoNothing();
 }
 
+/**
+ * Signs the money movement into the collection's evidence chain. A failure here must never undo or
+ * block the payment itself, so it is logged and the message goes out without a proof link.
+ */
+async function recordEvidence(
+  col: Collection,
+  stats: CollectionStats,
+  e: Pick<EvidenceBody, "record" | "event" | "amount_cents" | "currency" | "party" | "purpose" | "paypal" | "authorised_by" | "failure">,
+): Promise<string | null> {
+  try {
+    const card = await appendCard({
+      ...e,
+      collection: { id: col.id, code: col.code },
+      totals: { raised_cents: stats.raisedCents, paid_out_cents: stats.paidOutCents, balance_cents: stats.availableCents },
+    });
+    return proofUrl(card.id);
+  } catch (err) {
+    console.error("[evidence] could not sign", e.event, e.record, err);
+    return null;
+  }
+}
+
 async function onContributionPaid(ctb: Contribution) {
   const col = await getCollectionById(ctb.collectionId);
   if (!col) return;
@@ -366,6 +395,17 @@ async function onContributionPaid(ctb: Contribution) {
       .where(and(eq(pledges.collectionId, col.id), eq(pledges.userId, ctb.contributorId), eq(pledges.status, "open")));
   }
   const stats = await collectionStats(col);
+  const proof = await recordEvidence(col, stats, {
+    record: ctb.id,
+    event: "payment_received",
+    amount_cents: ctb.amountCents,
+    currency: ctb.currency,
+    party: firstName(ctb.displayName),
+    purpose: null,
+    paypal: { order_id: ctb.paypalOrderId, capture_id: ctb.paypalCaptureId },
+    authorised_by: "payer_via_paypal",
+    failure: null,
+  });
   const owner = await getUser(col.ownerId);
   const amount = money(ctb.amountCents, ctb.currency);
   if (ctb.contributorId) {
@@ -377,8 +417,8 @@ async function onContributionPaid(ctb: Contribution) {
         contributor.phone,
         t(
           L,
-          `✅ *Malipo yamepokelewa* — asante, ${ctb.displayName}!\n${amount} kwa *${col.title}* (${col.code}).\nKumbukumbu ya PayPal: ${ref}\n\n${statusLine(col, stats, L)}`,
-          `✅ *Payment received* — thank you, ${ctb.displayName}!\n${amount} to *${col.title}* (${col.code}).\nPayPal ref: ${ref}\n\n${statusLine(col, stats, L)}`,
+          `✅ *Malipo yamepokelewa* — asante, ${ctb.displayName}!\n${amount} kwa *${col.title}* (${col.code}).\nKumbukumbu ya PayPal: ${ref}${proof ? `\n🔏 Uthibitisho uliosainiwa: ${proof}` : ""}\n\n${statusLine(col, stats, L)}`,
+          `✅ *Payment received* — thank you, ${ctb.displayName}!\n${amount} to *${col.title}* (${col.code}).\nPayPal ref: ${ref}${proof ? `\n🔏 Signed proof: ${proof}` : ""}\n\n${statusLine(col, stats, L)}`,
         ),
       );
     }
@@ -691,6 +731,17 @@ export async function finalizePayout(p: Payout, status: "success" | "failed", it
   const col = await getCollectionById(p.collectionId);
   const owner = col ? await getUser(col.ownerId) : undefined;
   if (!col) return done;
+  const proof = await recordEvidence(col, await collectionStats(col), {
+    record: done.id,
+    event: status === "success" ? "payout_sent" : "payout_failed",
+    amount_cents: done.amountCents,
+    currency: done.currency,
+    party: done.recipientName ?? maskEmail(done.recipientEmail),
+    purpose: done.note,
+    paypal: { batch_id: done.paypalBatchId, item_id: done.paypalItemId },
+    authorised_by: "organiser_confirm_code",
+    failure: status === "failed" ? (done.failureReason ?? "failed") : null,
+  });
   if (status === "failed") {
     if (owner) {
       const L = await langOf(owner.phone);
@@ -712,8 +763,8 @@ export async function finalizePayout(p: Payout, status: "success" | "failed", it
   const update = (L: Lang) =>
     t(
       L,
-      `🧾 *Taarifa ya uwazi — ${col.title}*\n${amt} imelipwa kwa *${who}*${p.note ? ` kwa ajili ya ${p.note}` : ""}.\nZilizochangwa ${raised} · Zilizolipwa ${paid} · Salio ${bal}\nKumbukumbu ya PayPal: ${ref}`,
-      `🧾 *Transparency update — ${col.title}*\n${amt} was paid to *${who}*${p.note ? ` for ${p.note}` : ""}.\nRaised ${raised} · Paid out ${paid} · Balance ${bal}\nPayPal payout ref: ${ref}`,
+      `🧾 *Taarifa ya uwazi — ${col.title}*\n${amt} imelipwa kwa *${who}*${p.note ? ` kwa ajili ya ${p.note}` : ""}.\nZilizochangwa ${raised} · Zilizolipwa ${paid} · Salio ${bal}\nKumbukumbu ya PayPal: ${ref}${proof ? `\n🔏 Uthibitisho uliosainiwa: ${proof}` : ""}`,
+      `🧾 *Transparency update — ${col.title}*\n${amt} was paid to *${who}*${p.note ? ` for ${p.note}` : ""}.\nRaised ${raised} · Paid out ${paid} · Balance ${bal}\nPayPal payout ref: ${ref}${proof ? `\n🔏 Signed proof: ${proof}` : ""}`,
     );
   if (owner) await sendTo(owner.phone, update(await langOf(owner.phone)));
   // Broadcast to every distinct contributor reachable in chat.

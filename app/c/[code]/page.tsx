@@ -7,6 +7,7 @@ import { collectionStats, findCollection, getUser, listPayouts, searchSupporters
 import { money } from "@/lib/format";
 import { waLink } from "@/lib/channels/whatsapp";
 import { categoryEmoji, simulatorUrl } from "@/lib/services/links";
+import { chainFor, firstBroken } from "@/lib/services/evidence";
 import { contributeAction } from "./actions";
 import { AmountInput } from "./amount-input";
 import { SupporterSearch } from "./supporter-search";
@@ -20,12 +21,16 @@ export default async function CollectionPage({ params, searchParams }: PageProps
   if (!col) notFound();
   const q = typeof sp.q === "string" ? sp.q : "";
   const pageNo = Number(typeof sp.page === "string" ? sp.page : 1) || 1;
-  const [stats, owner, supporters, pays] = await Promise.all([
+  const [stats, owner, supporters, pays, chain] = await Promise.all([
     collectionStats(col),
     getUser(col.ownerId),
     searchSupporters(col.id, { q, page: pageNo, pageSize: 8 }),
     listPayouts(col.id),
+    chainFor(col.id),
   ]);
+  // Latest signed card per payout, and whether the whole chain still verifies.
+  const proofOf = new Map(chain.map((c) => [c.recordId, c.id]));
+  const brokenAt = firstBroken(chain);
   const ledger = pays.filter((p) => p.status === "success" || p.status === "processing");
   const chat = waLink(`Contribute ${col.code}`) ?? simulatorUrl(`Contribute ${col.code}`);
   const err = typeof sp.err === "string" ? sp.err : null;
@@ -83,11 +88,27 @@ export default async function CollectionPage({ params, searchParams }: PageProps
                     {p.note ? <span className="text-ink-soft"> · {p.note}</span> : null}
                     {p.status === "processing" ? <span className="ml-2 text-xs text-marigold">processing</span> : null}
                   </span>
-                  <span className="font-mono">{money(p.amountCents, p.currency)}</span>
+                  <span className="flex items-baseline gap-3">
+                    {proofOf.has(p.id) ? (
+                      <Link href={`/proof/${proofOf.get(p.id)}`} className="text-xs text-forest-2 underline">
+                        proof
+                      </Link>
+                    ) : null}
+                    <span className="font-mono">{money(p.amountCents, p.currency)}</span>
+                  </span>
                 </li>
               ))}
             </ul>
           )}
+          {chain.length ? (
+            <p className={`mt-3 text-sm ${brokenAt === undefined ? "text-ink-soft" : "font-semibold text-terracotta"}`}>
+              🔏 Every payment and payout is signed into a tamper-evident chain ({chain.length} so far) ·{" "}
+              {brokenAt === undefined ? <span className="text-forest">✓ intact</span> : <>✗ broken at card #{brokenAt}</>} ·{" "}
+              <Link href={`/proof/${chain.at(-1)!.id}`} className="underline">
+                latest proof
+              </Link>
+            </p>
+          ) : null}
 
           {stats.paidCount > 0 ? (
             <section id="supporters" className="mt-10 scroll-mt-4">
@@ -97,7 +118,7 @@ export default async function CollectionPage({ params, searchParams }: PageProps
                   <SupporterSearch initial={q} />
                 </Suspense>
               </div>
-              <SupporterList items={supporters.items} q={q} byEmail={supporters.byEmail} />
+              <SupporterList items={supporters.items} q={q} byEmail={supporters.byEmail} proofOf={proofOf} />
               {supporters.pages > 1 ? (
                 <Pager code={col.code} q={q} page={supporters.page} pages={supporters.pages} total={supporters.total} />
               ) : null}
@@ -151,7 +172,7 @@ function ago(d: Date): string {
   return "";
 }
 
-function SupporterList({ items, q, byEmail }: { items: Supporter[]; q: string; byEmail: boolean }) {
+function SupporterList({ items, q, byEmail, proofOf }: { items: Supporter[]; q: string; byEmail: boolean; proofOf: Map<string, string> }) {
   if (items.length === 0) {
     return (
       <p className="mt-4 rounded-2xl border border-dashed border-line px-4 py-6 text-center text-sm text-ink-soft">
@@ -176,9 +197,14 @@ function SupporterList({ items, q, byEmail }: { items: Supporter[]; q: string; b
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline justify-between gap-3">
               <p className="truncate font-semibold">{s.name}</p>
-              <time dateTime={s.paidAt.toISOString()} className="shrink-0 text-xs text-ink-soft">
-                {ago(s.paidAt)}
-              </time>
+              <span className="flex shrink-0 items-baseline gap-2 text-xs text-ink-soft">
+                {proofOf.has(s.id) ? (
+                  <Link href={`/proof/${proofOf.get(s.id)}`} className="text-forest-2 underline">
+                    proof
+                  </Link>
+                ) : null}
+                <time dateTime={s.paidAt.toISOString()}>{ago(s.paidAt)}</time>
+              </span>
             </div>
             {s.message ? <p className="mt-0.5 break-words text-sm text-ink-soft">&ldquo;{s.message}&rdquo;</p> : null}
           </div>

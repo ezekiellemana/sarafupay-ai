@@ -228,6 +228,42 @@ async function main() {
   assert.equal(stats.availableCents, 1000);
   console.log("✓ payout confirmed by code, executed once, transparency broadcast; balance", stats.availableCents / 100);
 
+  // 7b. Evidence chain: every capture and payout is signed, linked and verifiable by anyone
+  {
+    const ev = await import("../lib/services/evidence");
+    const chain = await ev.chainFor(col.id);
+    const events = chain.map((c) => JSON.parse(c.body).event);
+    assert.ok(events.includes("payment_received") && events.at(-1) === "payout_sent", "captures and the payout are on the chain");
+    assert.equal(chain.filter((c) => c.recordId === ctb.id).length, 1, "the idempotent re-capture signed nothing twice");
+    assert.deepEqual(await ev.verifyChain(col.id), { ok: true, length: chain.length, brokenAt: null });
+    const payoutCard = JSON.parse(chain.at(-1)!.body);
+    assert.equal(payoutCard.authorised_by, "organiser_confirm_code");
+    assert.equal(payoutCard.totals.balance_cents, 1000, "card carries the totals right after the payout");
+    assert.ok(!chain.some((c) => c.body.includes("@")), "no emails in signed cards");
+    assert.ok((await inbox(AMINA)).some((m) => /Payment received|Malipo yamepokelewa/.test(m) && /\/proof\/ev_[a-f0-9]{16}/.test(m)), "receipt links its signed proof");
+    assert.ok((await inbox(AMINA)).some((m) => /Transparency update|Taarifa ya uwazi/.test(m) && m.includes(`/proof/${chain.at(-1)!.id}`)), "transparency update links the payout proof");
+
+    // What /proof's "Verify in my browser" does, with WebCrypto against the public API response.
+    const { GET } = await import("../app/api/proof/[id]/route");
+    const res = await GET(new Request("https://sarafupay.test"), { params: Promise.resolve({ id: chain[0]!.id }) } as never);
+    const r = (await res.json()) as { body: string; hash: string; sig: string; publicKey: string };
+    const digest = Buffer.from(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(r.body))).toString("hex");
+    assert.equal(digest, r.hash);
+    const pub = await crypto.subtle.importKey("raw", Buffer.from(r.publicKey, "base64url"), { name: "Ed25519" }, false, ["verify"]);
+    assert.ok(await crypto.subtle.verify({ name: "Ed25519" }, pub, Buffer.from(r.sig, "base64url"), Buffer.from(r.hash, "hex")), "signature verifies with only public data");
+
+    // Tampering with an amount, or deleting a card, is caught.
+    const first = chain[0]!;
+    await db.update(schema.evidenceCards).set({ body: first.body.replace(/"amount_cents":\d+/, '"amount_cents":1') }).where(eq(schema.evidenceCards.id, first.id));
+    assert.equal((await ev.verifyChain(col.id)).brokenAt, 1, "edited card detected");
+    await db.update(schema.evidenceCards).set({ body: first.body }).where(eq(schema.evidenceCards.id, first.id));
+    await db.delete(schema.evidenceCards).where(eq(schema.evidenceCards.id, first.id));
+    assert.equal((await ev.verifyChain(col.id)).ok, false, "deleted card detected (the next card still points at it)");
+    await db.insert(schema.evidenceCards).values(first);
+    assert.equal((await ev.verifyChain(col.id)).ok, true, "chain intact again once restored");
+    console.log(`✓ evidence chain: ${chain.length} signed cards, verifiable in the browser, edits and deletions detected`);
+  }
+
   // 8. Non-owner report = totals only
   const { buildTools } = await import("../lib/agent/tools");
   const john = (await db.select().from(schema.users).where(eq(schema.users.phone, JOHN)))[0];
