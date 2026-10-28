@@ -1,4 +1,4 @@
-import { pgTable, text, integer, timestamp, serial, index } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, timestamp, serial, index, uniqueIndex } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
   id: text("id").primaryKey(),
@@ -130,9 +130,27 @@ export const reminderDrafts = pgTable("reminder_drafts", {
   sentAt: timestamp("sent_at", { withTimezone: true }),
 });
 
+// Evidence cards: one signed, hash-chained entry per money movement (a PayPal capture, a payout).
+// `body` is the exact JSON that was hashed and signed; it's never rewritten.
+export const evidenceCards = pgTable(
+  "evidence_cards",
+  {
+    id: text("id").primaryKey(),
+    collectionId: text("collection_id").notNull(),
+    recordId: text("record_id").notNull(), // contribution or payout id
+    seq: integer("seq").notNull(), // position in the collection's chain, from 1
+    body: text("body").notNull(),
+    hash: text("hash").notNull(), // sha256 of body, hex
+    sig: text("sig").notNull(), // Ed25519 signature of hash, base64url
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("evidence_chain_idx").on(t.collectionId, t.seq), index("evidence_record_idx").on(t.recordId)],
+);
+
 export type User = typeof users.$inferSelect;
 export type Collection = typeof collections.$inferSelect;
 export type Contribution = typeof contributions.$inferSelect;
 export type Pledge = typeof pledges.$inferSelect;
 export type Payout = typeof payouts.$inferSelect;
 export type ReminderDraft = typeof reminderDrafts.$inferSelect;
+export type EvidenceCard = typeof evidenceCards.$inferSelect;

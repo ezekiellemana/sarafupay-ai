@@ -13,6 +13,11 @@ export const env = {
   paypalClientId: () => get("PAYPAL_CLIENT_ID"),
   paypalSecret: () => get("PAYPAL_SECRET", get("PAYPAL_CLIENT_SECRET")),
   paypalWebhookId: () => get("PAYPAL_WEBHOOK_ID"),
+  /**
+   * Ed25519 key that signs evidence cards: a base64 32-byte seed (`openssl rand -base64 32`).
+   * Keep it stable; changing it makes older cards show as signed by an old key.
+   */
+  evidenceSigningKey: () => get("EVIDENCE_SIGNING_KEY"),
   paypalApiBase: () => "https://api-m.sandbox.paypal.com", // sandbox only, per hackathon rules
 
   geminiApiKey: () => get("GOOGLE_GENERATIVE_AI_API_KEY", get("GEMINI_API_KEY")),

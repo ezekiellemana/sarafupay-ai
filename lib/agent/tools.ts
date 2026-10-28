@@ -7,6 +7,7 @@ import { paypalConfigured } from "../env";
 import { sendTo } from "../channels/messaging";
 import * as core from "../services/core";
 import { investigate, sendReminderDrafts } from "../services/investigate";
+import { chainFor, firstBroken, proofUrl } from "../services/evidence";
 import { collectionUrl, dashboardUrl, payUrl, shareMessage } from "../services/links";
 import { createAndSendPledgeInvoice, toolkitToolsForAgent } from "../paypal/toolkit";
 import { getDb, schema } from "../db";
@@ -339,10 +340,15 @@ export function buildTools(ctx: AgentContext): Record<string, Tool> {
       inputSchema: z.object({ code }),
       execute: safe(async ({ code: c }) => {
         const col = await mustFind(c);
-        const rows = await core.listPayouts(col.id);
-        return rows
-          .filter((r) => r.status !== "cancelled" && r.status !== "awaiting_confirmation")
-          .map((r) => ({ to: r.recipientName ?? "recipient", amount: money(r.amountCents, r.currency), purpose: r.note, status: r.status, at: r.executedAt }));
+        const [rows, chain] = await Promise.all([core.listPayouts(col.id), chainFor(col.id)]);
+        const proofOf = new Map(chain.map((c) => [c.recordId, proofUrl(c.id)]));
+        const brokenAt = firstBroken(chain);
+        return {
+          payouts: rows
+            .filter((r) => r.status !== "cancelled" && r.status !== "awaiting_confirmation")
+            .map((r) => ({ to: r.recipientName ?? "recipient", amount: money(r.amountCents, r.currency), purpose: r.note, status: r.status, at: r.executedAt, signed_proof: proofOf.get(r.id) ?? null })),
+          evidence_chain: { cards: chain.length, intact: brokenAt === undefined, public_page: collectionUrl(col.code) },
+        };
       }),
     }),
 
